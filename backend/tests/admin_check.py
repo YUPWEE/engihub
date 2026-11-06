@@ -82,6 +82,19 @@ check("pdf >15MB rejected 413", big.status_code == 413, str(big.status_code))
 nofile = c.post("/resources", data={"course_id": cid, "title": "nf", "type": "notes", "kind": "pdf"})
 check("pdf kind without file 400", nofile.status_code == 400)
 
+# ---------- PDF storage lives in MongoDB: counter goes up on upload, back down on delete
+used0 = a.get("/admin/overview").json()["storage"]["used_bytes"]
+pdf = b"%PDF-1.4\n" + b"x" * 1000 + b"\n%%EOF\n"
+up = c.post("/resources", data={"course_id": cid, "title": "STORAGE", "type": "notes", "kind": "pdf"},
+            files={"file": ("s.pdf", io.BytesIO(pdf), "application/pdf")})
+check("pdf upload ok", up.status_code == 200, up.text)
+used1 = a.get("/admin/overview").json()["storage"]["used_bytes"]
+check("storage counter rose by the file size", used1 - used0 == len(pdf), f"{used0}->{used1}")
+dl = c.get(f"/resources/{up.json()['id']}/open")
+check("pdf bytes round-trip through MongoDB intact", dl.status_code == 200 and dl.content == pdf)
+a.delete(f"/admin/resources/{up.json()['id']}")
+check("deleting the resource frees its bytes", a.get("/admin/overview").json()["storage"]["used_bytes"] == used0)
+
 # ---------- sessions + reports
 s = c.post("/sessions", json={"course_id": cid, "name": "جلسة", "description": "وصف", "contact_url": "https://t.me/x"}).json()
 check("session bad contact rejected", c.post("/sessions", json={"course_id": cid, "name": "n", "description": "d", "contact_url": "http://x.com"}).status_code == 400)

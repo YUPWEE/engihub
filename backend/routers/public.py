@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from lib import storage
 from lib.catalog import (
@@ -187,12 +187,12 @@ async def open_resource(resource_id: str):
     await log_event("download", resource_id)
     if doc["kind"] == "link":
         return RedirectResponse(doc["url"], status_code=302, headers={"Referrer-Policy": "no-referrer"})
-    path = storage.path_for(doc.get("file_name") or "")
-    if not path.is_file():
+    data = await storage.read_pdf(doc.get("file_name"))
+    if data is None:
         raise HTTPException(status_code=404, detail="file_missing")
     # HTTP headers must be latin-1: ASCII-only fallback name, real (Arabic) title goes in RFC 5987 filename*.
     safe_ascii = "".join(c if (c.isascii() and c.isalnum()) or c in "-_ " else "_" for c in doc["title"])[:80].strip("_ ") or "resource"
-    return FileResponse(path, media_type="application/pdf", headers={
+    return Response(data, media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename=\"{safe_ascii}.pdf\"; filename*=UTF-8''{quote(doc['title'][:80])}.pdf",
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; sandbox",

@@ -39,13 +39,16 @@ cd frontend && npm run typecheck && npm run lint && npm run build
 cd backend  && .venv/Scripts/python tests/smoke_check.py   # needs the backend running; restart it before a second run
 ```
 
-## Deploying
+## Deploying (free tier)
 
-- The frontend is a static build (`frontend/dist`); it needs `/api/*` rewritten to the backend so cookies stay same-origin
-  (the admin cookie is `SameSite=Strict; Secure`, so it will not work across different domains).
-- Backend env vars: see `backend/.env.example`. Behind a reverse proxy set `TRUSTED_PROXY_HOPS=1` and run uvicorn with `--no-proxy-headers`.
-- Uploaded PDFs are written to `UPLOAD_DIR` on local disk; hosts with ephemeral disks (most free tiers) lose them on redeploy.
-  Use a persistent disk or move uploads to object storage before relying on them.
-- MongoDB: any MongoDB (a free Atlas cluster works). The app seeds branches/courses on first start if the database is empty.
+Vercel (site) -> Render (API) -> MongoDB Atlas (data and PDFs). Step-by-step: [DEPLOY.md](DEPLOY.md).
+
+- The frontend is a static build (`frontend/dist`) with `frontend/vercel.json` rewriting `/api/*` to the backend, so the
+  browser stays on one origin (the admin cookie is `SameSite=Strict; Secure` and would not work across domains).
+- `render.yaml` defines the API service. Env vars are listed in `backend/.env.example`. Behind reverse proxies set
+  `TRUSTED_PROXY_HOPS` to the number of proxies and run uvicorn with `--no-proxy-headers`.
+- Uploaded PDFs are stored inside MongoDB (collection `pdf_files`), not on disk, so they survive redeploys. Atlas' free
+  tier is 512 MB in total, hence `STORAGE_QUOTA_MB=300`.
+- The app seeds branches/courses on first start if the database is empty.
 
 `TEMPLATE.md` is the original Emergent scaffold's agent notes and can be ignored.
