@@ -17,8 +17,8 @@ services:
         sync: false
       - key: DB_NAME
         value: engihub
-      - key: CORS_ORIGINS       # the Vercel site URL, e.g. https://engihub.vercel.app
-        sync: false
+      - key: CORS_ORIGINS       # the Vercel site (browsers reach the API same-origin through Vercel's /api rewrite)
+        value: https://engihub-sooty.vercel.app
       - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_TOKEN_SECRET
@@ -27,5 +27,5 @@ services:
         value: "300"
       - key: APP_TZ
         value: Asia/Riyadh
-      - key: TRUSTED_PROXY_HOPS # Vercel rewrite + Render's own proxy; verify after deploy
-        value: "2"
+      - key: CLIENT_IP_HEADER   # visitor address for rate limits: set (and overwritten) by Vercel on every request.
+        value: x-vercel-forwarded-for # Measured chain on Render: client, Vercel egress, Cloudflare, Render (positions are not stable).

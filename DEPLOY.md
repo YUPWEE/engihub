@@ -26,5 +26,8 @@ Order matters: database, then API, then site.
 ## 4. Verify
 - Open the site, search a course, add a link and a small PDF, download it.
 - Sign in as admin (key icon in the footer) with `ADMIN_PASSWORD`; check the dashboard loads and storage shows usage.
-- Rate limiting: `TRUSTED_PROXY_HOPS=2` assumes Vercel + Render's proxy. Confirm that different visitors are limited
-  independently (the per-visitor limit should not trip for everyone at once).
+- Rate limiting: `render.yaml` sets `CLIENT_IP_HEADER=x-vercel-forwarded-for`, a header Vercel sets itself and overwrites,
+  so visitors are limited individually. (Measured chain on Render: visitor, Vercel egress IP, Cloudflare edge IP, Render
+  internal IP. Counting positions in `X-Forwarded-For` does not work there because the middle entries change per request.)
+  Limitation: anyone who calls the Render URL directly can set that header themselves. The admin login stays protected
+  either way, since failed logins are also capped globally.

@@ -28,6 +28,14 @@ def _client_addr(request: Request) -> str:
     ignored by default. Behind N trusted proxies (Render, Vercel, nginx...) set TRUSTED_PROXY_HOPS=N and the
     entry the outermost trusted proxy added (N-th from the right) is used instead."""
     direct = request.client.host if request.client else ""
+    # Preferred: a header your trusted edge sets itself and overwrites on every request (e.g. Vercel's
+    # `x-vercel-forwarded-for`). Independent of how many proxies sit in between.
+    # Caveat: only trustworthy if clients cannot reach this server except through that edge.
+    header = os.environ.get("CLIENT_IP_HEADER", "").strip().lower()
+    if header:
+        first = request.headers.get(header, "").split(",")[0].strip()
+        if first:
+            return first
     try:
         hops = int(os.environ.get("TRUSTED_PROXY_HOPS", "0"))
     except ValueError:

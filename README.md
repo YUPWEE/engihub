@@ -46,7 +46,7 @@ Vercel (site) -> Render (API) -> MongoDB Atlas (data and PDFs). Step-by-step: [D
 - The frontend is a static build (`frontend/dist`) with `frontend/vercel.json` rewriting `/api/*` to the backend, so the
   browser stays on one origin (the admin cookie is `SameSite=Strict; Secure` and would not work across domains).
 - `render.yaml` defines the API service. Env vars are listed in `backend/.env.example`. Behind reverse proxies set
-  `TRUSTED_PROXY_HOPS` to the number of proxies and run uvicorn with `--no-proxy-headers`.
+  `CLIENT_IP_HEADER` (e.g. `x-vercel-forwarded-for`) and run uvicorn with `--no-proxy-headers`.
 - Uploaded PDFs are stored inside MongoDB (collection `pdf_files`), not on disk, so they survive redeploys. Atlas' free
   tier is 512 MB in total, hence `STORAGE_QUOTA_MB=300`.
 - The app seeds branches/courses on first start if the database is empty.
