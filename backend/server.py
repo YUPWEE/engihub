@@ -44,6 +44,14 @@ async def root():
     return {"message": "EngiHub API"}
 
 
+@api_router.get("/_whoami")  # TEMPORARY DIAGNOSTIC - remove after the proxy-chain check
+async def _whoami(request: Request):
+    h = request.headers
+    return {"xff": h.get("x-forwarded-for"), "x_real_ip": h.get("x-real-ip"), "vercel_xff": h.get("x-vercel-forwarded-for"),
+            "cf_connecting_ip": h.get("cf-connecting-ip"), "true_client_ip": h.get("true-client-ip"),
+            "client_host": request.client.host if request.client else None, "header_names": sorted(h.keys())}
+
+
 api_router.include_router(public_routes.router)
 api_router.include_router(admin_routes.router)
 api_router.include_router(admin_routes.guarded)
