@@ -1,0 +1,71 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import APIRouter, FastAPI, Request
+from starlette.middleware.cors import CORSMiddleware
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection
+from lib.db import client, ensure_indexes  # noqa: E402
+from lib.linkcheck import link_check_loop  # noqa: E402
+from lib.seed import seed_if_empty  # noqa: E402
+from routers import admin as admin_routes  # noqa: E402
+from routers import public as public_routes  # noqa: E402
+
+# Privacy: never log visitor addresses or user agents (uvicorn's access log contains them).
+logging.getLogger("uvicorn.access").disabled = True
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await ensure_indexes()
+    await seed_if_empty()
+    app.state.link_task = asyncio.create_task(link_check_loop())
+    yield
+    app.state.link_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await app.state.link_task
+    client.close()
+
+
+app = FastAPI(lifespan=lifespan, title="EngiHub API")
+
+api_router = APIRouter(prefix="/api")
+
+
+@api_router.get("/")
+async def root():
+    return {"message": "EngiHub API"}
+
+
+api_router.include_router(public_routes.router)
+api_router.include_router(admin_routes.router)
+api_router.include_router(admin_routes.guarded)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Include the router in the main app — keep last.
+app.include_router(api_router)

@@ -1,0 +1,206 @@
+{
+  "theme": {
+    "mode": "dark_by_default",
+    "notes": "Dark navy theme with soft borders and calm muted teal/sage accents (WCAG AA compliant). Supports Arabic RTL by default with English LTR toggle. In index.html, html class is 'dark'."
+  },
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#0B1120",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "card_surface",
+        "kind": "solid",
+        "bg": "#131C31",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "elevated_panel",
+        "kind": "solid",
+        "bg": "#1E293B",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#CBD5E1"
+      },
+      {
+        "name": "search_surface",
+        "kind": "solid",
+        "bg": "#162036",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "accent_badge_teal",
+        "kind": "solid",
+        "bg": "#134E4A",
+        "on_bg": "#5EEAD4",
+        "on_bg_muted": "#2DD4BF"
+      },
+      {
+        "name": "accent_badge_sage",
+        "kind": "solid",
+        "bg": "#1C3829",
+        "on_bg": "#A7F3D0",
+        "on_bg_muted": "#6EE7B7"
+      },
+      {
+        "name": "accent_badge_warning",
+        "kind": "solid",
+        "bg": "#451A03",
+        "on_bg": "#FDBA74",
+        "on_bg_muted": "#FB923C"
+      },
+      {
+        "name": "accent_badge_danger",
+        "kind": "solid",
+        "bg": "#4C0519",
+        "on_bg": "#FDA4AF",
+        "on_bg_muted": "#FB7185"
+      },
+      {
+        "name": "header_glass",
+        "kind": "glass",
+        "contrast_against": "#0B1120",
+        "guarantee": "backdrop-blur-xl bg-[#0B1120]/85 border-b border-slate-800/80",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "modal_surface",
+        "kind": "solid",
+        "bg": "#111827",
+        "on_bg": "#F9FAFB",
+        "on_bg_muted": "#9CA3AF"
+      }
+    ],
+    "accent": "#14B8A6",
+    "on_accent": "#042F2E",
+    "accent_hover": "#0D9488",
+    "border_subtle": "#1E293B",
+    "border_highlight": "#334155",
+    "brand_ksu_blue": "#0284C7"
+  },
+  "typography": {
+    "font_family_sans": "var(--font-sans), 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif",
+    "font_family_heading": "var(--font-heading), 'IBM Plex Sans Arabic', system-ui, sans-serif",
+    "font_family_mono": "'IBM Plex Mono', 'Geist Mono', monospace",
+    "scale_px": {
+      "display": 54,
+      "h1": 42,
+      "h2": 32,
+      "h3": 24,
+      "h4": 18,
+      "body": 16,
+      "caption": 14
+    },
+    "rules": [
+      "Use IBM Plex Sans Arabic for authentic Arabic & English rendering",
+      "Course codes (e.g. MATH 106, GE 105, CEN 320) must use high-emphasis typography with tracking-tight and mono/bold weight",
+      "Directional awareness: set dir='rtl' (default) or dir='ltr' on root container or html, mirroring icons and paddings accordingly"
+    ]
+  },
+  "entry_surfaces": {
+    "/": "Hero search & suggestion bar centered over dark navy mesh, followed by department branches bento grid, trending courses & recent resource downloads",
+    "/courses": "Filterable department pill-bar with instant code/name search bar and responsive two-column course grid",
+    "/branch/:code": "Branch identity header with course count + search & action button, followed by structured department course directory",
+    "/course/:id": "High-impact course code heading + Arabic/English dual title, branch pill, grouped tabbed resource shelf with direct action bar",
+    "/admin": "Restricted administrative control surface with key metrics, report resolution table, broken links monitor, storage indicators, and branch/course/session CRUD managers"
+  },
+  "resource_categories": [
+    {
+      "key": "slides",
+      "name_ar": "شرائح المحاضرات",
+      "name_en": "Lecture Slides",
+      "icon": "Presentation",
+      "color_class": "text-sky-400 bg-sky-950/50 border-sky-800/40"
+    },
+    {
+      "key": "handouts",
+      "name_ar": "مذكرات وتفريغات",
+      "name_en": "Notes & Handouts",
+      "icon": "FileText",
+      "color_class": "text-teal-400 bg-teal-950/50 border-teal-800/40"
+    },
+    {
+      "key": "textbooks",
+      "name_ar": "الكتب والمراجع",
+      "name_en": "Textbooks & References",
+      "icon": "BookOpen",
+      "color_class": "text-indigo-400 bg-indigo-950/50 border-indigo-800/40"
+    },
+    {
+      "key": "exams",
+      "name_ar": "نماذج اختبارات سابقة",
+      "name_en": "Past Exams",
+      "icon": "CheckSquare",
+      "color_class": "text-amber-400 bg-amber-950/50 border-amber-800/40",
+      "has_solutions_badge": true
+    },
+    {
+      "key": "summaries",
+      "name_ar": "ملخصات وقوانين",
+      "name_en": "Summaries & Cheat Sheets",
+      "icon": "Zap",
+      "color_class": "text-emerald-400 bg-emerald-950/50 border-emerald-800/40"
+    },
+    {
+      "key": "videos",
+      "name_ar": "شروحات مرئية",
+      "name_en": "Video Lectures",
+      "icon": "Video",
+      "color_class": "text-rose-400 bg-rose-950/50 border-rose-800/40"
+    },
+    {
+      "key": "other",
+      "name_ar": "روابط ومصادر أخرى",
+      "name_en": "Other Links & Repos",
+      "icon": "Link2",
+      "color_class": "text-slate-400 bg-slate-800/50 border-slate-700/40"
+    }
+  ],
+  "ksu_engineering_departments": [
+    {"code": "GE", "name_ar": "الإعداد العام الهندسي", "name_en": "General Engineering", "icon": "Layers"},
+    {"code": "EE", "name_ar": "الهندسة الكهربائية", "name_en": "Electrical Engineering", "icon": "Cpu"},
+    {"code": "ME", "name_ar": "الهندسة الميكانيكية", "name_en": "Mechanical Engineering", "icon": "Cog"},
+    {"code": "CE", "name_ar": "الهندسة المدنية", "name_en": "Civil Engineering", "icon": "Building2"},
+    {"code": "CHE", "name_ar": "الهندسة الكيميائية", "name_en": "Chemical Engineering", "icon": "FlaskConical"},
+    {"code": "IE", "name_ar": "الهندسة الصناعية", "name_en": "Industrial Engineering", "icon": "Factory"},
+    {"code": "PGE", "name_ar": "هندسة النفط والغاز الطبيعي", "name_en": "Petroleum & Natural Gas Engineering", "icon": "Flame"}
+  ],
+  "component_structure": {
+    "Navbar": "Sticky top bar with KSU College of Engineering emblem, centered EngiHub wordmark in styled badge, Language switcher (AR/EN), All Courses button, and fast Add Resource trigger",
+    "HeroSearch": "Large rounded pill container with instant suggestion dropdown (supports course codes like 'MATH 106', 'ريض 106', or course names in AR/EN)",
+    "BranchCardGrid": "Grid with code tag, Arabic name, English name, live course count, and subtle hover glowing border",
+    "ResourceRow": "Individual item showing category icon, title, source badge (Uploaded PDF / Google Drive / OneDrive / YouTube), upload date, 'Helpful' upvote button, 'Report' trigger, broken link flag, and download/visit link",
+    "StudySessionsSection": "Secondary section for peer online study sessions (Discord/Telegram/Zoom) with clear academic integrity disclaimer",
+    "UnifiedAddResourceModal": "Dialog with Course searchable select, resource category, title, description, Upload File / External Link selector, plus toggle for Study Session mode",
+    "AdminModalAndDashboard": "Password prompt ('admin123' / configurable) leading to control panel: Reports table, Broken links list, Stats, Add/Edit/Delete Course/Branch/Session, Export JSON & Import CSV",
+    "QRCodeModal": "Shareable modal showing clean SVG QR code of EngiHub KSU URL with 'Download PNG' action",
+    "Footer": "KSU student initiative mark, Privacy manifesto ('No ads · No login · No visitor data collected'), admin key icon, and QR code button"
+  },
+  "motion": {
+    "preset": "Subtle, crisp transitions",
+    "hover_lift": "hover:-translate-y-0.5 hover:shadow-lg transition-transform duration-200 ease-out",
+    "modal_entrance": "fade-in-50 zoom-in-95 duration-150",
+    "dropdown_animation": "animate-in fade-in-80 slide-in-from-top-1 duration-150"
+  },
+  "accessibility": {
+    "contrast": "All text tokens meet 4.5:1 minimum on their respective navy and panel backgrounds",
+    "keyboard_nav": "Full arrow key and ESC navigation for search dropdown and modals",
+    "aria_labels": "Bilingual aria-label on all icon-only buttons (Helpful, Report, Admin key, QR code)",
+    "testing_attributes": "All clickable buttons, inputs, links, cards, and modal triggers MUST contain explicit 'data-testid' attributes in kebab-case (e.g. data-testid='hero-search-input', data-testid='add-resource-button', data-testid='lang-toggle-btn')"
+  },
+  "instructions_to_main_agent": [
+    "Install and configure @fontsource/ibm-plex-sans-arabic and @fontsource/ibm-plex-sans in frontend/src/index.css or ensure beautiful font fallback so Arabic calligraphy is sharp and modern.",
+    "Implement full bilingual support (Arabic as default with RTL direction dir='rtl', English with LTR direction dir='ltr') via React context or state, persisting in localStorage.",
+    "Seed a comprehensive set of real King Saud University College of Engineering courses across GE (General Prep), EE, ME, CE, CHE, IE, and PGE departments with realistic sample resources (slides, past exams with solutions, summaries, and textbooks).",
+    "Add functional file upload capability (handling local/blob storage or simulated file hosting for PDFs) along with direct Google Drive / OneDrive / YouTube external link support.",
+    "Implement real upvote/helpful increments, report item triggers, broken link reporting, and admin verification dashboard.",
+    "Include an interactive QR code generator component (using 'qrcode.react' or SVG canvas) with instant PNG download capability.",
+    "Ensure every UI element has high-contrast text against dark navy backgrounds (#0B1120, #131C31, #1E293B) and that no transparent dropdown backgrounds exist."
+  ]
+}
