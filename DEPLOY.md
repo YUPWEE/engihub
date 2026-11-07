@@ -31,3 +31,14 @@ Order matters: database, then API, then site.
   internal IP. Counting positions in `X-Forwarded-For` does not work there because the middle entries change per request.)
   Limitation: anyone who calls the Render URL directly can set that header themselves. The admin login stays protected
   either way, since failed logins are also capped globally.
+
+## Gotcha: Vercel blocks commits from other identities
+On Vercel's free (Hobby) plan, a push is only deployed if the commit's author is the GitHub account linked to the Vercel
+account; otherwise the deployment shows as **BLOCKED**. Commit as that account, e.g. in this repo:
+`git config user.name YUPWEE` and `git config user.email 350624975+YUPWEE@users.noreply.github.com` (GitHub's noreply
+address for the account). Commits authored with any other email (such as a different GitHub account's) are skipped.
+
+## Bulk-adding resource links
+Dashboard -> Import / Export -> "Import resource links from CSV". Columns: `code,name_ar,name_en,type,title,url`.
+`data/drive-import.csv` is the set built from the shared KSU Drive (see `data/build_drive_import.py`). Create any missing
+branch first (e.g. NJM); re-uploading is safe, existing links are skipped.
