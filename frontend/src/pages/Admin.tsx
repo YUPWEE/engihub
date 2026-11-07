@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { courseCode, errorKey, formatBytes, formatDate, useAdminStatus, useCatalog, useSettings } from "@/lib/queries";
-import type { AdminOverview, Branch, BranchIn, ImportIn, ImportResult, OkOut, SiteSettings } from "@/lib/types";
+import type { AdminOverview, Branch, BranchIn, ImportIn, ImportResourcesResult, ImportResult, OkOut, SiteSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function Stat({ label, value, testid }: { label: string; value: string | number; testid: string }) {
@@ -67,6 +67,7 @@ export default function Admin() {
   const { data } = useQuery({ queryKey: ["admin-overview"], queryFn: () => apiGet<AdminOverview>("/admin/overview"), enabled: admin });
   const [branchEdit, setBranchEdit] = useState<{ open: boolean; b?: Branch }>({ open: false });
   const [importRes, setImportRes] = useState<ImportResult | null>(null);
+  const [importResRes, setImportResRes] = useState<ImportResourcesResult | null>(null);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin-overview"] });
@@ -93,6 +94,16 @@ export default function Admin() {
   const importCsv = useMutation({
     mutationFn: (csv: string) => apiPost<ImportResult>("/admin/import-courses", { csv } satisfies ImportIn),
     onSuccess: (r) => { setImportRes(r); toast.success(t("importDone", { c: r.created, s: r.skipped })); refresh(); },
+    onError: onErr,
+  });
+  const importResCsv = useMutation({
+    mutationFn: (csv: string) => apiPost<ImportResourcesResult>("/admin/import-resources", { csv } satisfies ImportIn),
+    onSuccess: (r) => {
+      setImportResRes(r);
+      toast.success(t("importResourcesDone", { c: r.courses_created, r: r.resources_created, s: r.skipped }));
+      refresh();
+      qc.invalidateQueries({ queryKey: ["home"] });
+    },
     onError: onErr,
   });
 
@@ -267,6 +278,36 @@ export default function Admin() {
                 {importRes.errors.length > 0 && (
                   <ul className="mt-1 list-disc ps-4 text-red-300" dir="ltr">
                     {importRes.errors.slice(0, 10).map((er) => <li key={er}>{er}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-5" data-testid="admin-import-resources-card">
+            <h3 className="font-semibold">{t("importResources")}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{t("importResourcesHint")}</p>
+            <label className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-4 cursor-pointer")} data-testid="admin-import-resources-label">
+              <Upload className="size-3.5" />
+              {t("chooseCsv")}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                disabled={importResCsv.isPending}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importResCsv.mutate(await f.text());
+                  e.target.value = "";
+                }}
+                data-testid="admin-import-resources-input"
+              />
+            </label>
+            {importResRes && (
+              <div className="mt-3 text-xs text-muted-foreground" data-testid="admin-import-resources-result">
+                {t("importResourcesDone", { c: importResRes.courses_created, r: importResRes.resources_created, s: importResRes.skipped })}
+                {importResRes.errors.length > 0 && (
+                  <ul className="mt-1 list-disc ps-4 text-red-300" dir="ltr">
+                    {importResRes.errors.slice(0, 10).map((er) => <li key={er}>{er}</li>)}
                   </ul>
                 )}
               </div>

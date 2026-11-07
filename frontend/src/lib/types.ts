@@ -197,3 +197,10 @@ export interface ImportResult {
   skipped: number;
   errors: string[];
 }
+
+export interface ImportResourcesResult {
+  courses_created: number;
+  resources_created: number;
+  skipped: number;
+  errors: string[];
+}

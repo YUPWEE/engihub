@@ -220,3 +220,10 @@ class ImportResult(BaseModel):
     created: int
     skipped: int
     errors: list[str]
+
+
+class ImportResourcesResult(BaseModel):
+    courses_created: int
+    resources_created: int
+    skipped: int
+    errors: list[str]

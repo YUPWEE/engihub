@@ -3,6 +3,7 @@
 import asyncio
 import csv
 import io
+from typing import get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
@@ -17,11 +18,11 @@ from lib.security import (
     ADMIN_COOKIE, ADMIN_TTL_SECONDS, global_hit, global_limited, is_admin, make_admin_token, password_ok,
     peek_limited, rate_limit, require_admin,
 )
-from lib.textnorm import detect_source, is_personal_contact, split_code, valid_https
+from lib.textnorm import detect_source, is_personal_contact, norm_number, split_code, valid_https
 from models.schemas import (
     AdminCounts, AdminLogin, AdminMe, AdminOverview, Branch, BranchIn, Course, CourseUpdate, ImportIn,
-    ImportResult, OkOut, Report, ReportOut, Resource, ResourceUpdate, ResourceWithCourse, StorageInfo,
-    SiteSettings, StudySession, StudySessionUpdate, new_id,
+    ImportResourcesResult, ImportResult, OkOut, Report, ReportOut, Resource, ResourceType, ResourceUpdate,
+    ResourceWithCourse, StorageInfo, SiteSettings, StudySession, StudySessionUpdate, new_id,
 )
 
 router = APIRouter(prefix="/admin")
@@ -273,6 +274,57 @@ async def import_courses(body: ImportIn):
                                      "name_ar": name_ar.strip(), "name_en": name_en.strip()})
         created += 1
     return ImportResult(created=created, skipped=skipped, errors=errors[:100])
+
+
+@guarded.post("/import-resources", response_model=ImportResourcesResult)
+async def import_resources(body: ImportIn):
+    """Bulk-add external links. CSV columns: code, name_ar, name_en, type, title, url (header row optional).
+    Missing courses are created (name falls back to the code, editable later); a link already present on its
+    course is skipped, so re-uploading the same file is safe."""
+    branches = await branch_map()
+    rows = list(csv.reader(io.StringIO(body.csv.lstrip("﻿"))))
+    if rows and rows[0] and rows[0][0].strip().lower() in ("code", "course_code", "رمز"):
+        rows = rows[1:]
+    types = set(get_args(ResourceType))
+    courses_created = resources_created = skipped = 0
+    errors: list[str] = []
+    for i, row in enumerate(rows, start=1):
+        if not any(c.strip() for c in row):
+            continue
+        code, name_ar, name_en, rtype, title, url = ([c.strip() for c in row] + [""] * 6)[:6]
+        prefix, number = split_code(code)
+        branch = match_branch(prefix, branches)
+        if not branch:
+            errors.append(f"row {i}: unknown branch '{prefix}' (create it under Branches first)")
+            continue
+        num = norm_number(number)
+        title = title.strip()
+        if not title or len(title) > 200:
+            errors.append(f"row {i}: title missing or longer than 200 characters")
+            continue
+        if is_personal_contact(url) or not valid_https(url):
+            errors.append(f"row {i}: invalid or non-https link")
+            continue
+        course = await db.courses.find_one({"branch_id": branch.id, "number": num}, {"_id": 0})
+        if not course:
+            try:
+                await validate_course_fields(branch.id, number, name_ar or code, name_en)
+            except HTTPException as exc:
+                errors.append(f"row {i}: {exc.detail}")
+                continue
+            course = {"id": new_id(), "branch_id": branch.id, "number": num, "name_ar": (name_ar or code).strip(),
+                      "name_en": name_en.strip()}
+            await db.courses.insert_one(dict(course))
+            courses_created += 1
+        if await db.resources.find_one({"course_id": course["id"], "url": url}):
+            skipped += 1
+            continue
+        res = Resource(course_id=course["id"], title=title, type=rtype.lower() if rtype.lower() in types else "other",
+                       kind="link", url=url, source=detect_source(url), link_status="unknown")
+        await db.resources.insert_one(res.model_dump())
+        resources_created += 1
+    return ImportResourcesResult(courses_created=courses_created, resources_created=resources_created,
+                                 skipped=skipped, errors=errors[:100])
 
 
 @guarded.get("/export")

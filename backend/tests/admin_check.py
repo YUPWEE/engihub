@@ -95,6 +95,32 @@ check("pdf bytes round-trip through MongoDB intact", dl.status_code == 200 and d
 a.delete(f"/admin/resources/{up.json()['id']}")
 check("deleting the resource frees its bytes", a.get("/admin/overview").json()["storage"]["used_bytes"] == used0)
 
+# ---------- bulk resource import (CSV)
+res_csv = "\n".join([
+    "code,name_ar,name_en,type,title,url",
+    "اختبر 301,اسم عربي,Name EN,exams,Exams folder,https://drive.google.com/drive/folders/abc123",
+    "اختبر 302,,,notes,No-name course,https://drive.google.com/open?id=xyz789",
+    "اختبر 301,,,weird,Type falls back to other,https://drive.google.com/drive/folders/def456",
+    "اختبر 301,,,exams,Duplicate link,https://drive.google.com/drive/folders/abc123",
+    "زززز 100,,,exams,Unknown branch,https://example.com/x",
+    "اختبر 303,,,exams,Not https,http://example.com/x",
+    "اختبر 12,,,exams,Bad course code,https://example.com/x",
+])
+imp1 = a.post("/admin/import-resources", json={"csv": res_csv}).json()
+check("resource import: 2 courses, 3 links, 1 duplicate skipped, 3 bad rows",
+      (imp1.get("courses_created"), imp1.get("resources_created"), imp1.get("skipped"), len(imp1.get("errors", []))) == (2, 3, 1, 3), str(imp1))
+imp2 = a.post("/admin/import-resources", json={"csv": res_csv}).json()
+check("re-uploading the same file adds nothing (idempotent)", (imp2.get("courses_created"), imp2.get("resources_created")) == (0, 0) and imp2.get("skipped") == 4, str(imp2))
+cat_now = c.get("/catalog").json()["courses"]
+c301 = next(x for x in cat_now if x["branch_id"] == bid and x["number"] == "301")
+c302 = next(x for x in cat_now if x["branch_id"] == bid and x["number"] == "302")
+check("imported course keeps its given names; nameless one gets the code as placeholder",
+      c301["name_en"] == "Name EN" and c301["name_ar"] == "اسم عربي" and c302["name_ar"] == "اختبر 302", f"{c301} {c302}")
+d301 = c.get(f"/courses/{c301['id']}").json()["resources"]
+check("imported links: source=gdrive, kind=link, unknown type -> other",
+      len(d301) == 2 and all(r["source"] == "gdrive" and r["kind"] == "link" for r in d301) and {r["type"] for r in d301} == {"exams", "other"}, str(d301))
+check("import requires admin", httpx.post(BASE + "/admin/import-resources", json={"csv": res_csv}, timeout=20).status_code == 401)
+
 # ---------- sessions + reports
 s = c.post("/sessions", json={"course_id": cid, "name": "جلسة", "description": "وصف", "contact_url": "https://t.me/x"}).json()
 check("session bad contact rejected", c.post("/sessions", json={"course_id": cid, "name": "n", "description": "d", "contact_url": "http://x.com"}).status_code == 400)
