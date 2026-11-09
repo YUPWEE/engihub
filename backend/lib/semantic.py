@@ -76,7 +76,8 @@ async def sync() -> dict[str, int]:
                 if failures > MAX_SYNC_FAILURES:
                     logger.warning("embedding sync stopped early (%d of %d done)", done, len(stale))
                     break
-                batch = max(5, batch // 2)
+                if gemini.cooldown_left() <= 0:  # not a rate limit (that sets a cooldown): try smaller requests
+                    batch = max(5, batch // 2)
                 wait = max(gemini.cooldown_left(), RETRY_WAIT)
                 logger.info("embedding batch refused; retrying %d items in %.0fs", batch, wait)
                 await asyncio.sleep(wait)
