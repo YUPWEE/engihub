@@ -8,14 +8,15 @@ import hashlib
 import os
 import re
 
-os.environ.update(MONGO_URL="mongomock://local", DB_NAME="ai_test", ADMIN_PASSWORD="pw", ADMIN_TOKEN_SECRET="x" * 32,
-                  GEMINI_API_KEY="fake-key", CORS_ORIGINS="http://test")
+for k, v in dict(MONGO_URL="mongomock://local", DB_NAME="engihub_test", ADMIN_PASSWORD="pw",
+                 ADMIN_TOKEN_SECRET="x" * 32, CORS_ORIGINS="http://test").items():
+    os.environ.setdefault(k, v)  # shared with test_import.py when both run in one process
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 
-from lib import gemini, semantic  # noqa: E402
+from lib import gemini, security, semantic  # noqa: E402
 from lib.db import db  # noqa: E402
 from server import app  # noqa: E402
 
@@ -43,7 +44,10 @@ async def fake_post(path: str, body: dict):
 
 @pytest_asyncio.fixture
 async def api(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     monkeypatch.setattr(gemini, "_post", fake_post)
+    security._buckets.clear()  # rate-limit counters are per process; start each test fresh
+    semantic._pending, semantic._dirty = None, False  # a task left on a previous test's (closed) event loop
     calls.clear()
     gemini._used.update(search=0, other=0)
     gemini._cooldown_until = 0.0
@@ -134,6 +138,58 @@ async def test_sync_is_incremental_and_prunes_deleted(api):
     await db.resources.delete_one({"id": r["id"]})
     pruned = await semantic.sync()
     assert pruned["removed"] == 1 and first["total"] == pruned["total"] + 1
+
+
+async def test_sync_waits_out_refusals_and_finishes(api, monkeypatch):
+    """Free-tier per-minute limits: refused batches are retried (smaller) instead of abandoning the sync."""
+    monkeypatch.setattr(semantic, "RETRY_WAIT", 0.01)
+    c = await first_course(api)
+    for n in range(12):
+        await add_link(api, c["id"], f"Chapter {n} notes")
+    refusals = {"left": 3}
+
+    async def flaky(path, body):
+        if path.endswith(":batchEmbedContents") and refusals["left"] > 0:
+            refusals["left"] -= 1
+            return None
+        return await fake_post(path, body)
+
+    monkeypatch.setattr(gemini, "_post", flaky)
+    await db.embeddings.delete_many({})
+    out = await semantic.sync()
+    assert refusals["left"] == 0 and out["embedded"] == out["total"]
+    assert await db.embeddings.count_documents({}) == out["total"]
+
+
+async def test_edit_during_running_sync_is_not_lost(api, monkeypatch):
+    c = await first_course(api)
+    await semantic.sync()
+    gate = asyncio.Event()
+    real_sync = semantic.sync
+    runs = []
+
+    async def slow_sync():
+        runs.append(1)
+        if len(runs) == 1:
+            await gate.wait()  # first run is still busy when the next edit arrives
+        return await real_sync()
+
+    if semantic._pending:  # the app's own startup sync (20 s delay) would absorb this test's requests
+        semantic._pending.cancel()
+        semantic._pending = None
+    monkeypatch.setattr(semantic, "sync", slow_sync)
+    semantic.schedule_sync(delay=0)
+    await asyncio.sleep(0.05)
+    await add_link(api, c["id"], "Added while indexing")  # calls schedule_sync during the run
+    gate.set()
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if not semantic.sync_running():
+            break
+    assert len(runs) == 2
+    keys = {d["_id"] for d in await db.embeddings.find({}, {"_id": 1}).to_list(1000)}
+    added = await db.resources.find_one({"title": "Added while indexing"})
+    assert f"r:{added['id']}" in keys
 
 
 async def test_search_unavailable_returns_ai_false(api, monkeypatch):

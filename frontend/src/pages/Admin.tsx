@@ -27,7 +27,11 @@ function Stat({ label, value, testid }: { label: string; value: string | number;
 function AiCard() {
   const { t } = useI18n();
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["admin-ai"], queryFn: () => apiGet<AIStatus>("/admin/ai") });
+  const { data } = useQuery({
+    queryKey: ["admin-ai"],
+    queryFn: () => apiGet<AIStatus>("/admin/ai"),
+    refetchInterval: (q) => (q.state.data?.syncing ? 5000 : false), // live progress while indexing
+  });
   const reindex = useMutation({
     mutationFn: () => apiPost<AIStatus>("/admin/ai/reindex"),
     onSuccess: (s) => {
@@ -43,6 +47,7 @@ function AiCard() {
       {data && (
         <p className="mt-3 text-xs text-muted-foreground" data-testid="admin-ai-status">
           {data.enabled ? t("aiOn", { i: data.indexed, n: data.total, u: data.calls_used, l: data.calls_limit }) : t("aiOff")}
+          {data.syncing && <span className="ms-1 text-sage">{t("aiIndexing")}</span>}
         </p>
       )}
       <Button type="button" variant="outline" size="sm" className="mt-4" disabled={!data?.enabled || reindex.isPending}

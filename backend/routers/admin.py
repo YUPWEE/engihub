@@ -131,8 +131,9 @@ async def ai_status():
 
 @guarded.post("/ai/reindex", response_model=AIStatus)
 async def ai_reindex():
-    """Embed anything new or changed so AI search can find it (also runs on its own after edits)."""
-    await semantic.sync()
+    """Start embedding anything new or changed so AI search can find it (also runs on its own after edits).
+    Runs in the background: a large catalog takes minutes on the free tier, longer than a proxied request."""
+    semantic.schedule_sync(delay=0)
     return AIStatus(**await semantic.status())
 
 

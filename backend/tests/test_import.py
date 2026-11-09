@@ -4,8 +4,9 @@ Run serially:  python -m pytest tests/test_import.py -n 0"""
 
 import os
 
-os.environ.update(MONGO_URL="mongomock://local", DB_NAME="import_test", ADMIN_PASSWORD="pw",
-                  ADMIN_TOKEN_SECRET="y" * 32, CORS_ORIGINS="http://test", GEMINI_API_KEY="")
+for k, v in dict(MONGO_URL="mongomock://local", DB_NAME="engihub_test", ADMIN_PASSWORD="pw",
+                 ADMIN_TOKEN_SECRET="x" * 32, CORS_ORIGINS="http://test").items():
+    os.environ.setdefault(k, v)  # shared with test_ai.py when both run in one process
 
 import httpx  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -17,7 +18,8 @@ HEADER = "code,name_ar,name_en,type,title,url,has_solutions,section,description\
 
 
 @pytest_asyncio.fixture
-async def admin():
+async def admin(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test/api") as c:
             await db.resources.delete_many({})

@@ -73,6 +73,10 @@ def _spend(bucket: str) -> bool:
     return True
 
 
+def cooldown_left() -> float:
+    return max(0.0, _cooldown_until - time.monotonic())
+
+
 def usage() -> dict[str, int]:
     _roll_day()
     return {"used": sum(_used.values()), "limit": sum(_limit(b) for b in _BUDGET_ENV)}

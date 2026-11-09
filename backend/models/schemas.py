@@ -232,6 +232,7 @@ class AIStatus(BaseModel):
     embed_model: str
     calls_used: int
     calls_limit: int
+    syncing: bool = False
 
 
 class ImportIn(BaseModel):

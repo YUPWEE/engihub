@@ -18,6 +18,9 @@ _lock = asyncio.Lock()
 _pending: Optional[asyncio.Task] = None
 _vectors: Optional[list[tuple[str, list[float]]]] = None  # [("c:<id>" | "r:<id>", unit vector)]
 _query_cache: "OrderedDict[str, list[float]]" = OrderedDict()
+_dirty = False
+RETRY_WAIT = 65.0  # seconds; the free tier limits requests and tokens per minute
+MAX_SYNC_FAILURES = 6
 
 
 def _min_score() -> float:
@@ -63,41 +66,64 @@ async def sync() -> dict[str, int]:
         if gone:
             await db.embeddings.delete_many({"_id": {"$in": gone}})
         stale = [k for k, text in wanted.items() if have.get(k) != _hash(text)]
-        done = 0
-        for i in range(0, len(stale), gemini.EMBED_BATCH):
-            keys = stale[i:i + gemini.EMBED_BATCH]
+        done, i, batch, failures = 0, 0, gemini.EMBED_BATCH, 0
+        while i < len(stale):
+            keys = stale[i:i + batch]
             vecs = await gemini.embed([wanted[k] for k in keys], query=False)
             if vecs is None:
-                logger.warning("embedding sync stopped early (%d of %d done)", done, len(stale))
-                break
+                # Free-tier per-minute limits (or a transient error): wait it out, then retry smaller.
+                failures += 1
+                if failures > MAX_SYNC_FAILURES:
+                    logger.warning("embedding sync stopped early (%d of %d done)", done, len(stale))
+                    break
+                batch = max(5, batch // 2)
+                wait = max(gemini.cooldown_left(), RETRY_WAIT)
+                logger.info("embedding batch refused; retrying %d items in %.0fs", batch, wait)
+                await asyncio.sleep(wait)
+                continue
+            failures = 0
             for k, v in zip(keys, vecs):
                 await db.embeddings.update_one({"_id": k}, {"$set": {"h": _hash(wanted[k]), "v": v}}, upsert=True)
             done += len(keys)
+            i += len(keys)
+            _vectors = None  # searches see new items as they arrive
         _vectors = None
+        logger.info("embedding sync: %d embedded, %d removed, %d total", done, len(gone), len(wanted))
         return {"embedded": done, "removed": len(gone), "total": len(wanted)}
 
 
 def schedule_sync(delay: float = 5.0) -> None:
-    """Re-sync soon, coalescing bursts of edits into one run. Safe to call from any request."""
-    global _pending
-    if not gemini.enabled() or (_pending is not None and not _pending.done()):
+    """Re-sync soon, coalescing bursts of edits into one run. Safe to call from any request: a call that arrives
+    while a run is in progress makes that run go round once more, so no edit is ever missed."""
+    global _pending, _dirty
+    if not gemini.enabled():
+        return
+    _dirty = True
+    if _pending is not None and not _pending.done():
         return
 
     async def run() -> None:
-        global _pending
+        global _dirty
         try:
-            await asyncio.sleep(delay)
-            await sync()
+            while _dirty:
+                _dirty = False
+                await asyncio.sleep(delay)
+                await sync()
         except Exception as exc:  # background job: never crash the app
             logger.error("embedding sync failed: %s", exc)
 
     _pending = asyncio.create_task(run())
 
 
+def sync_running() -> bool:
+    return _pending is not None and not _pending.done()
+
+
 async def status() -> dict:
     wanted = await db.courses.count_documents({}) + await db.resources.count_documents({})
     return {
         "enabled": gemini.enabled(), "indexed": await db.embeddings.count_documents({}), "total": wanted,
+        "syncing": sync_running(),
         "text_model": gemini.text_model(), "embed_model": gemini.embed_model(), **{
             f"calls_{k}": v for k, v in gemini.usage().items()},
     }
