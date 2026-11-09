@@ -60,7 +60,8 @@ Limits and privacy:
   items a day (`GEMINI_DAILY_INDEX_ITEMS`) so visitors' searches (`GEMINI_DAILY_SEARCH`, 200) always have quota left. A
   big import such as the ~1,800 Drive links therefore becomes fully searchable over two to three days: the sync waits out
   each limit, retries every 30 minutes until done, and also resumes when the free instance wakes up. The admin AI card
-  shows progress and the last Gemini error. Until an item is indexed, keyword search still finds it.
+  shows progress and the last Gemini error. Until a file is indexed it is still on its course page; the keyword search
+  box matches courses only.
 - Tests: `cd backend && python -m pytest tests/test_ai.py tests/test_import.py -n 0` (Gemini is faked, no key needed).
 
 ## Gotcha: Vercel blocks commits from other identities
