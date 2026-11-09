@@ -55,7 +55,11 @@ Limits and privacy:
   are never sent. Mention it in your privacy note if you have one.
 - `SEARCH_MIN_SCORE` (default 0.35) and the 0.12 closeness window in `lib/semantic.py` decide how strict suggestions are;
   tune them after trying real queries.
-- Tests: `cd backend && python -m pytest tests/test_ai.py -n 0` (Gemini is faked, no key needed).
+- Indexing speed: the free tier allows only a couple of embedding calls (50 items each) per minute, so a big import
+  (e.g. the ~1,800 Drive links) takes about 25-30 minutes to become searchable. The sync waits out each "too many
+  requests" pause and carries on by itself; the admin AI card shows progress. While it pauses, AI search briefly
+  falls back to keyword-only results.
+- Tests: `cd backend && python -m pytest tests/test_ai.py tests/test_import.py -n 0` (Gemini is faked, no key needed).
 
 ## Gotcha: Vercel blocks commits from other identities
 On Vercel's free (Hobby) plan, a push is only deployed if the commit's author is the GitHub account linked to the Vercel
