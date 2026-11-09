@@ -154,6 +154,8 @@ async def update_resource(resource_id: str, body: ResourceUpdate):
         raise HTTPException(status_code=404, detail="resource_not_found")
     upd = {"title": body.title.strip(), "type": body.type, "description": body.description.strip(),
            "has_solutions": body.has_solutions and body.type == "exams"}
+    if body.section is not None:
+        upd["section"] = body.section.strip()
     if doc["kind"] == "link" and body.url is not None and body.url.strip() != doc.get("url"):
         url = body.url.strip()
         if is_personal_contact(url):
@@ -296,20 +298,26 @@ async def import_courses(body: ImportIn):
 
 @guarded.post("/import-resources", response_model=ImportResourcesResult)
 async def import_resources(body: ImportIn):
-    """Bulk-add external links. CSV columns: code, name_ar, name_en, type, title, url (header row optional).
-    Missing courses are created (name falls back to the code, editable later); a link already present on its
-    course is skipped, so re-uploading the same file is safe."""
+    """Bulk-add external links. CSV columns: code, name_ar, name_en, type, title, url, and optionally
+    has_solutions (1/true/yes), section (sub-heading such as the source folder) and description (header row
+    optional). Missing courses are created (name falls back to the code, editable later); a link already present
+    on its course is skipped, so re-uploading is safe. Courses and existing links are loaded once and new links inserted in one batch, so thousands of rows fit
+    well inside a proxied request."""
     branches = await branch_map()
     rows = list(csv.reader(io.StringIO(body.csv.lstrip("﻿"))))
     if rows and rows[0] and rows[0][0].strip().lower() in ("code", "course_code", "رمز"):
         rows = rows[1:]
     types = set(get_args(ResourceType))
-    courses_created = resources_created = skipped = 0
+    courses = {(c["branch_id"], c["number"]): c for c in await db.courses.find({}, {"_id": 0}).to_list(20000)}
+    existing = {(d["course_id"], d.get("url")) for d in
+                await db.resources.find({"kind": "link"}, {"_id": 0, "course_id": 1, "url": 1}).to_list(500000)}
+    new_docs: list[dict] = []
+    courses_created = skipped = 0
     errors: list[str] = []
     for i, row in enumerate(rows, start=1):
         if not any(c.strip() for c in row):
             continue
-        code, name_ar, name_en, rtype, title, url = ([c.strip() for c in row] + [""] * 6)[:6]
+        code, name_ar, name_en, rtype, title, url, solved, section, description = ([c.strip() for c in row] + [""] * 9)[:9]
         prefix, number = split_code(code)
         branch = match_branch(prefix, branches)
         if not branch:
@@ -323,7 +331,7 @@ async def import_resources(body: ImportIn):
         if is_personal_contact(url) or not valid_https(url):
             errors.append(f"row {i}: invalid or non-https link")
             continue
-        course = await db.courses.find_one({"branch_id": branch.id, "number": num}, {"_id": 0})
+        course = courses.get((branch.id, num))
         if not course:
             try:
                 await validate_course_fields(branch.id, number, name_ar or code, name_en)
@@ -333,16 +341,22 @@ async def import_resources(body: ImportIn):
             course = {"id": new_id(), "branch_id": branch.id, "number": num, "name_ar": (name_ar or code).strip(),
                       "name_en": name_en.strip()}
             await db.courses.insert_one(dict(course))
+            courses[(branch.id, num)] = course
             courses_created += 1
-        if await db.resources.find_one({"course_id": course["id"], "url": url}):
+        if (course["id"], url) in existing:
             skipped += 1
             continue
-        res = Resource(course_id=course["id"], title=title, type=rtype.lower() if rtype.lower() in types else "other",
-                       kind="link", url=url, source=detect_source(url), link_status="unknown")
-        await db.resources.insert_one(res.model_dump())
-        resources_created += 1
+        existing.add((course["id"], url))
+        rtype = rtype.lower() if rtype.lower() in types else "other"
+        res = Resource(course_id=course["id"], title=title, type=rtype, kind="link", url=url,
+                       source=detect_source(url), link_status="unknown", description=description[:500],
+                       section=section[:120],
+                       has_solutions=rtype == "exams" and solved.lower() in ("1", "true", "yes", "y"))
+        new_docs.append(res.model_dump())
+    if new_docs:
+        await db.resources.insert_many(new_docs)
     semantic.schedule_sync()
-    return ImportResourcesResult(courses_created=courses_created, resources_created=resources_created,
+    return ImportResourcesResult(courses_created=courses_created, resources_created=len(new_docs),
                                  skipped=skipped, errors=errors[:100])
 
 

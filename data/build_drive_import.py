@@ -1,115 +1,230 @@
-"""Builds data/drive-import.csv from the crawled Google Drive structure and verifies every link is publicly
-reachable (anonymous request, no cookies).   python data/build_drive_import.py [--no-verify]
+"""Builds data/drive-import.csv from the shared KSU engineering Drive, file by file.
 
-Source: the shared KSU engineering handbook folder (one folder per course, with sub-folders such as exams/resources).
-Skipped on purpose: student grade-result sheets and "prepared by" credit PDFs."""
+    python -I data/build_drive_import.py            # crawl the Drive anonymously (no login, public items only)
+    python -I data/build_drive_import.py --cached   # reuse data/.drive-tree.json from the last crawl
+
+How the Drive maps onto the site:
+- Course folders live under the "مقررات ..." level folders; the course code is the folder name before "|".
+- Each document (PDF, slides, Word, video...) becomes one link. A folder that is mostly photos (WhatsApp exam
+  pictures, drawing-solution screenshots) becomes ONE link to the folder instead of dozens of images.
+- type comes from the folder path and file name; `section` is the sub-folder inside the course (e.g. "النهائية"),
+  shown as a collapsible sub-heading on the course page; has_solutions is set for exams named as solved.
+- Every course also gets one link to its whole Drive folder.
+- Skipped on purpose: grade-result sheets (privacy), the non-course "أدلة الكلية" folder and the initiative's own
+  files. Output columns match the admin importer: code,name_ar,name_en,type,title,url,has_solutions,section,description
+"""
 
 import csv
+import html
+import json
 import re
 import sys
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import httpx
 
-# course code (Arabic prefix + number) -> (name_ar, items). Items are (drive name, drive id).
-COURSES = {
-    "سلم 100": ("", [("الاختبارات", "1kF2aLwKKY5J3_kCLvI6tgniRMhZZ_Et8"), ("المصادر", "1gWelu6ani45s7TZAQXY32T3TKQWPhvny")]),
-    "سلم 102": ("", [("الاختبارات", "1hLURRnaoxiSq9gDnntOoN-oxiRCql9Rh"), ("المصادر", "19BD3FOfokhZ6PP3tlEPyZBMVJI3LqtpY")]),
-    "سلم 103": ("", [("الاختبارات", "1-v3Hi-ODtpsTbKSahDOmt5G_GQYsJIWE"), ("المصادر", "1zXAFqWjt4JwpztzLJ4F0mTXovz_krvL_")]),
-    "سلم 106": ("", [("الاختبارات", "1nFEfziggpf_H-mOL_qQtiVE6hcEnsrNh"), ("المصادر", "1iBM_5Dyrd3Agnp7I3bq230ejJmFRtWiL")]),
-    "سلم 107": ("", [("الاختبارات", "1FTfGM2UAeLt2I2HW6KQs4uKQQeVlz5Zu"), ("المصادر", "1Cg_mD9fRfjJtHq8bL-HCCS0raxdO8UM4")]),
-    "سلم 108": ("", [("الاختبارات", "15i5xSkTPMGhjpDo4gX9aoKLNCpKbAUcp"), ("المصادر", "1RAJKhp_dvAfj8qOloJ20HQWvs3LAKVTG")]),
-    "ريض 106": ("", [("الاختبارات", "1c-3BbFpNfbJvZgjkT-1GCYGr9r84fM8H"), ("المصادر", "1T9aGHLnyTHI7pVqb-SCwG1sv6xDSTaCi"), ("سبر - ريض 106", "1aMjyOIC7xlmK6UND8hH2VF3rQEI9jgXH")]),
-    "ريض 107": ("", [("الاختبارات", "1RCPPQtO_sIBbzs-BaXQyYME_ibpkLJzz"), ("المصادر", "13hW6TGkoP5DNtMpQYzIVQLwUnLTpeV3q"), ("سبر - ريض 107", "1fKZ9QgbdKKntIks8VIC-dutIm7VZC4i3")]),
-    "فيز 103": ("", [("الاختبارات", "1i-1SUJm6qLeU2nidKi_I05G3WiGuwXcG"), ("العملي", "1TPebibl3956-YXtrVR2OTyPLzBhQbBs_"), ("المصادر", "1rMUO9duvP33wasT08HAuDErA3PWg5BXR"), ("سبر - فيز 103", "1xx_YDUntL_g_oEs0d1lRX9JWX5faQqYx")]),
-    "نجم 109": ("", [("أمثلة مشاريع", "1YAMC5unbLQ7oeZpnkJNmaelwHqqD-J2U"), ("الاختبارات", "1QsoS-Dy_zAaktHm5OFStoSDfBgJ5Gdll"), ("المصادر", "1FYLSOkFMNKw1ySAS1WegfVHN8tWOtC4v")]),
-    "هعم 104": ("رسم", [("الاختبارات", "1NX7xYTfs2jfuLvnLpa6p_L9GA2MrxmVS"), ("المصادر", "1s2ADLx_TVo1-Fxwic9VBHbx3eY34JIeT"), ("2D Paper.pdf", "1LHdBf8AktUp7ZV95tWVXiWhIv4-Tf698"), ("3D Paper.pdf", "1VOd7TQL2ZdWMQUIqQeXbdi2304sqtjqL"), ("AUTOCAD Sheet", "1C8co5afLGzQ8YV2UDUELJJNaULAAKsvW"), ("سجل العمل لمادة الرسم الهندسي.docx", "1Qy0VisXXYYzGrInHqwdib6YEhxPtwqmo")]),
-    "ريض 203": ("", [("الاختبارات", "11BE0cYfZ8OtYu1-3GuccKiD-0vIfkE6K"), ("المصادر", "1-hAGvG5CRKsVigkx7Kz8gT4N8mYVsSrg")]),
-    "فيز 104": ("", [("الاختبارات", "1JfYNzxtikmWLBiGioH-MIV0XtxTQvPZy"), ("العملي", "1p1ro4fm1sfSW4eZ0VZUu9xWBRS-_3SWB"), ("المصادر", "1Au7kjzDD3H2dCWRcB_z0QvPdUG8UZLTi"), ("سبر - فيز 104", "1ztQI4qRLV9KbutFSp0StG_ktCymnGe_C")]),
-    "نجم 110": ("", [("أمثلة مشاريع", "1U3vCOPrBCD0k0Px16b1nWbZZAEqGoMft"), ("الاختبارات", "1iB1XT384f_Ktf9C_D4yv-3NRJ2vzINBi"), ("المصادر", "14VpfUkmOiaV-4MEU5CMsAC2_AGF2_ySS")]),
-    "هعم 106": ("", [("Tutorials", "1pDZEcJSUf3aerOC1fABU-sh1iETaW_9w"), ("الاختبارات", "1kdaPhOXbJSpkzwqZzaxMAoX3bWfrAzsy"), ("المشروع", "1Hk-f3zmDTJQv3N-wYua99Jw5hKwwEbj-"), ("المصادر", "1T9Q_skADvPCasaCLSYUWsgsFNEI0rTRa")]),
-    "هعم 201": ("ستاتيكا", [("1 _ الشرائح", "1wV-qieXS2kh-BfdNRokgFNbb4JssV8vN"), ("2 _ الكتب", "1YSEOXscNqjc5z_XmkXzwJrNNyb7EzDLb"), ("3 _ التمارين", "19aAH-2HbpONkQ-HL6qAdxF-W-W8ynqbf"), ("4 _ الاختبارات", "1XfnYemaz1Ig1piPNjRfDv70WbVVYun7M"), ("5 _ التقارير (MD)", "1QB3ax2XJBfsINsaLGkESrrEc4zEuwJbF"), ("سبر - هعم ٢٠١", "14qSX2owf5YP_z6ia2gfjyz8W3gJUPhiu"), ("خطة المادة.pdf", "1TTszm6kWAvSTQmAh7NRmcQO--87bwoVB")]),
-    "هعم 203": ("بيئة", [("الاختبارات", "1PAG1TpaBvYXOWFya4GxPJkid7xNH2a6-"), ("المشروع", "1TZxAuKAupgKnPK0iKUEtiayVJVvKCaiJ"), ("المصادر", "15-xx9yLU2Z1J6KfXV_I2qRZvB907CGq-"), ("سبر- 203 هعم", "1MroL-qVg7IFqIXHThYC9hWbSceTKYsEL")]),
-    "ريض 204": ("", [("0 | خطة المقرر + نصائح", "1QIxSg2vStlxfoLeJcb9J4uKOLZztLJl8"), ("1 | المصادر", "1zaorRfH2kXkb2i02Pg7MHdQwbjy-mPfU"), ("2 | الاختبارات", "1JYgweEyAe7q38tE84Kwt_rjXtBZk2emp")]),
-    "ريض 254": ("", [("1 | شروح", "1qlYqoGXjTvZbKh5cOrJZFaR2sEpP2j0n"), ("2 | التمارين", "1mSMw-be_yrrGs2wpD6a6D4o8rfvQ_37g"), ("3 | الاختبارات", "1KWXcgsMhBWi2LzVS1ZT0H9UI7BJmnR28"), ("254", "1Z2g3xe5V7kM9hrbAWWVFnX6JY293xeg4"), ("REC-M254", "1kdYQTuUtY46Dk3rhzchAnmnxUsKrJvjI"), ("الكتاب", "1OASfPsJrommJ4784RgBINuT2V23NitOw"), ("توصيف المقرر", "1AyX6Dmhod-KHn2UTj-vqfHXA7ALfFDAy")]),
-    "هعم 202": ("", [("اسئلة الخطة", "1Ri9TAttKNXc-eFseLnhp1_vf21hlBp3F"), ("الاختبارات", "18Lzmb2hJe-BOSiHr8jf9fk9rifNtdN7O"), ("المرجع", "1vLomlSkQF_J3IT_n8MJ2fJ-_ZdbtcyI9"), ("المصادر", "1S04bJ1S4hEv7gdW47QmYBLXo7xzauRzP"), ("ملفات الدكتور بسام البسام", "12PpadsfFpG1P_ykdha92rMAtFTJUoQ4e"), ("نوتات د.أحمد الخضير", "1Cx67A6ca-iGszj7BENFS6cycTocnij6S"), ("Syllabus_1_1448.pdf", "1CD2lLlzNgaL38fhdKZtkm5sM14CMdJTg"), ("دليل المقرر ( اجتهاد طلاب ).pdf", "1YhKNJt1CejyfvHrmadZCLCZKpv_Q4_Np"), ("مذكرة المهندس ابراهيم (محلولة).pdf", "1P1pVXRfhqNKO5gYEpTqUeCBb4_mC20dA"), ("ورقة معادلات الديناميكا.pdf", "1_tm8okXCPvSMnHCtozO_n7ESRdiZy3ee")]),
-    "هعم 209": ("", [("1 _ شرائح د. مقراوي", "19CWCP55pGju3a8c8mswQmeFis5TJzcJX"), ("2 _ التمارين", "1sjqBPgr0ouDs4EntR1bKcpSVLAp4vat6"), ("3 _ الاختبارات", "1hXZ5e5sn7Jl1dpJwfKxXic9rdz_GdL4K"), ("GE209_Syllabus_481.pdf", "1DQ8L5QCBAnKf9ksmw5exPOXRZMz8GsRK"), ("الكتاب.pdf", "1xHO7t9_RY-7Jh8ShPTfruC4GjPTfWR_K")]),
-    "هعم 211": ("برمجة", [("الاختبارات", "1qvxD-cTu3OE1gPU9g1pGr2pXIkEo1pVF"), ("المصادر", "1beo0gHOSgDLzhB9D2WSFHGwaBSERZg1b"), ("روابط لشرح مادة C++", "1Kz00jU1is53RHPgzphtyjtDO2dtyVP1zbu-4GIDJB5c"), ("نصائح ل C++.docx", "1xpm02a21jbjp55gVCYgR2TX8VJr_gOHc")]),
-    "هعم 402": ("", [("اختبارات", "1CbUBixYJvybHMggOti4uqodmvb5Boe3A"), ("المصادر", "1FlWnptEqvwU-yQoNrjBysrMWixqc2RJt")]),
-    "هعم 403": ("", [("الاختبارات", "1ilacsAlSqO2hbhoh_aHpNETx71tQynTd"), ("المصادر", "1jIZ_hQ-3mIBYIOrAErfyzBFGgbFPYt_P")]),
-}
-EN_PREFIX = {"سلم": "SALM", "ريض": "MATH", "فيز": "PHYS", "نجم": "NJM", "هعم": "GE"}
+ROOT = "1-1mGVrrYzo-RslxHhfHSZFPj-lZWsvxk"
+HERE = Path(__file__).parent
+CACHE = HERE / ".drive-tree.json"
+OUT = HERE / "drive-import.csv"
+SKIP_NAMES = ("نتائج الدرجات", "سبر", "تم الإعداد من", "تم الاعداد من")  # grades, empty folders, credits
+SKIP_RE = r"^نتائج .*طلاب"  # student result sheets
+MIN_IMAGES_TO_COLLAPSE, MAX_DOCS_SHARE = 3, 0.15
 
 
-def classify(name: str) -> str:
-    n = name.lower()
-    if "اختبار" in n: return "exams"
-    if "شرائح" in n: return "slides"
-    if any(k in n for k in ("الكتب", "الكتاب", "المرجع")): return "textbooks"
-    if any(k in n for k in ("التمارين", "شروح", "نوتات", "ملفات الدكتور", "مذكرة", "معادلات", "اسئلة الخطة")): return "notes"
+# ---------- crawl ----------
+def parse_listing(text: str) -> list[dict]:
+    out = []
+    for chunk in text.split('<div class="flip-entry" id="entry-')[1:]:
+        href = re.search(r'<a href="([^"]+)"', chunk)
+        title = re.search(r'class="flip-entry-title">(.*?)</div>', chunk, re.S)
+        mime = re.search(r'/type/([\w./+-]+)"', chunk)
+        out.append({"id": re.match(r"[\w-]+", chunk).group(0), "href": html.unescape(href.group(1)) if href else "",
+                    "name": html.unescape(title.group(1)).strip() if title else "",
+                    "mime": mime.group(1) if mime else ""})
+    return out
+
+
+def crawl() -> dict:
+    client = httpx.Client(timeout=40, follow_redirects=True, headers={"Accept-Language": "en", "User-Agent": "Mozilla/5.0"})
+
+    def listing(fid: str) -> list[dict]:
+        for _ in range(4):
+            try:
+                r = client.get(f"https://drive.google.com/embeddedfolderview?id={fid}")
+                if r.status_code == 200:
+                    return parse_listing(r.text)
+            except httpx.HTTPError:
+                pass
+        raise RuntimeError(f"could not list folder {fid}")
+
+    nodes = {ROOT: {"id": ROOT, "name": "", "path": [], "folder": True, "children": []}}
+    frontier = [ROOT]
+    with ThreadPoolExecutor(8) as ex:
+        while frontier:
+            nxt = []
+            for fid, entries in zip(frontier, ex.map(listing, frontier)):
+                parent = nodes[fid]
+                for e in entries:
+                    parent["children"].append(e["id"])
+                    if e["id"] in nodes:
+                        continue
+                    folder = "/folders/" in e["href"]
+                    nodes[e["id"]] = {**e, "folder": folder, "children": [],
+                                      "path": parent["path"] + ([parent["name"]] if fid != ROOT else [])}
+                    if folder:
+                        nxt.append(e["id"])
+            frontier = nxt
+    return nodes
+
+
+# ---------- classify ----------
+def clean(seg: str) -> str:
+    seg = re.sub(r"^\s*\d+(\.\d+)?\s*(》|\||_)\s*", "", seg)  # "2》", "1 | ", "3 _ ", "2.1 | "
+    return seg.strip(" _-")
+
+
+def has(text: str, *words: str) -> bool:
+    return any(re.search(w, text, re.I) for w in words)
+
+
+def classify(segs: list[str], name: str, mime: str) -> str:
+    where = " / ".join(segs)
+    both = f"{where} / {name}"
+    if has(where, "اختبار", "اسئلة سابقة", "أسئلة سابقة", "تجميعات", "كويز") or \
+            has(name, r"\bquiz", "كويز", r"\bexam\b", r"\bmid\s*-?\s*\d", "midterm", "اختبار", r"\bfinal\b.*\b(exam|solved)"):
+        return "exams"
+    if has(where, "مشروع", "مشاريع", r"\bproject\b", "logbook", "poster", "report sample", "نتائج"):
+        return "other"
+    if mime.startswith(("video/", "audio/")) or has(both, "مقاطع شرح"):
+        return "videos"
+    if has(both, "تمارين", "التمارين", "tutorial", "home ?work", "هوموورك", "أسئلة الكتاب", "اسئلة الخطة",
+           r"\bproblems?\b", r"\blabs?\b", r"\bsheet\b", "واجب", r"\bexercises?\b"):
+        return "notes"
+    if has(both, "ملخص", "تلخيص", "تخليص", "قوانين", "معادلات", "cheat", "مراجعة", "تعاريف", "تعداد", "خريطة ذهنية",
+           "أحداث مهمة", "التواريخ", "الارقام", "ارقام المواد", "جدول يوضح", "المصطلحات", "أحكام"):
+        return "summaries"
+    if has(both, "شرائح", "سلايد", r"(^| / )د\.\s?", r"\bslides?\b", "عرض", "عروض", "محاضرات", r"\blecture", r"\bch(apter)?\s*-?\s*\d") or \
+            "presentation" in mime or mime == "application/vnd.ms-powerpoint":
+        return "slides"
+    if has(both, "المرجع", "الكتاب", "الكتب", "كتاب", r"\bbooks?\b", "textbook"):
+        return "textbooks"
+    if has(both, "مذكرة", "مذكرات", "نوتات", "أوراق", "ملازم", "شروح", "شرح", "ملفات الدكتور", r"\bnotes?\b"):
+        return "notes"
     return "other"
 
 
-def clean_title(name: str) -> str:
-    return re.sub(r"^\d+\s*[_|]\s*", "", name).strip()
+def solved(name: str, section: str) -> bool:
+    text = f"{section} / {name}"
+    if has(text, "بلا حل", "بدون حل", "without"):
+        return False
+    return has(text, "محلول", "الحل", "حلول", r"(^|[\s(_-])حل($|[\s)_.-])", r"\bsol(ution|ved|s)?\b", r"\banswers?\b")
 
 
-def url_for(name: str, drive_id: str) -> str:
-    is_file = bool(re.search(r"\.(pdf|docx?|xlsx?|pptx?|jpe?g|png)$", name, re.I)) or len(drive_id) > 40 or name == "AUTOCAD Sheet"
-    return f"https://drive.google.com/open?id={drive_id}" if is_file else f"https://drive.google.com/drive/folders/{drive_id}"
+def title_of(name: str) -> str:
+    t = re.sub(r"\.(pdf|docx?|pptx?|xlsx?|jpe?g|png|webp|mp4|txt|ogg)$", "", name, flags=re.I)
+    t = re.sub(r"^((copy of|نسخة من)\s+)+", "", t, flags=re.I)
+    t = re.sub(r"\[\d+\]$", "", t).replace("_", " ")
+    return re.sub(r"\s+", " ", t).strip()[:200] or name[:200]
 
 
-rows = []
-for code, (label, items) in COURSES.items():
-    prefix, number = code.split()
-    for name, drive_id in items:
-        rows.append({"code": code, "name_ar": label, "name_en": "", "type": classify(name), "title": clean_title(name),
-                     "url": url_for(name, drive_id), "drive_name": name})
+def file_url(node: dict) -> str:
+    href = node["href"]
+    m = re.match(r"https://drive\.google\.com/file/d/([\w-]+)", href)
+    if m:
+        return f"https://drive.google.com/file/d/{m.group(1)}/view"
+    return re.sub(r"[?&]usp=drive_web$", "", href)
 
-if "--no-verify" not in sys.argv:
-    BIDI = re.compile("[‎‏‪-‮⁦-⁩]")
 
-    def fetch(url):
-        last = None
-        for _ in range(3):  # transient disconnects happen
-            try:
-                resp = httpx.get(url, follow_redirects=True, timeout=30, headers={"Accept-Language": "en", "User-Agent": "Mozilla/5.0"})
-                return resp, BIDI.sub("", (re.search(r"<title>(.*?)</title>", resp.text, re.S) or [None, ""])[1]).strip()
-            except httpx.HTTPError as exc:
-                last = exc
-        raise last
+def build(nodes: dict) -> list[dict]:
+    def files_under(fid: str) -> list[dict]:
+        out = []
+        for c in nodes[fid]["children"]:
+            n = nodes.get(c)
+            if n and c != fid:
+                out += files_under(c) if n["folder"] else [n]
+        return out
 
-    def check(r):
-        drive_id = re.search(r"(?:folders/|id=)([\w-]+)", r["url"]).group(1)
-        try:
-            resp, title = fetch(r["url"])
-            if resp.status_code == 404 and "/folders/" in r["url"]:  # an extension-less item that is really a file
-                r["url"] = f"https://drive.google.com/open?id={drive_id}"
-                resp, title = fetch(r["url"])
-        except httpx.HTTPError as exc:
-            return r, "ERR " + str(exc)[:60]
-        low = title.lower()
-        if resp.status_code != 200 or "sign in" in low or "sign-in" in low or not title:
-            return r, f"NOT PUBLIC ({resp.status_code}, title={title!r})"
-        if not title.startswith(BIDI.sub("", r["drive_name"]).strip()[:12]) and r["url"].startswith("https://drive.google.com/drive/folders/"):
-            return r, f"TITLE MISMATCH (expected ~{r['drive_name']!r}, got {title!r})"
-        return r, "ok"
+    def image_heavy(fid: str) -> bool:
+        """Mostly photos: collapse into one folder link, but only when that hides very few documents."""
+        files = files_under(fid)
+        imgs = sum(1 for f in files if f["mime"].startswith("image/"))
+        if imgs >= MIN_IMAGES_TO_COLLAPSE and (len(files) - imgs) <= max(3, MAX_DOCS_SHARE * len(files)):
+            return True
+        # Big photo galleries (e.g. drawing-solution screenshots) whose few documents sit in sub-folders.
+        direct_docs = sum(1 for c in nodes[fid]["children"]
+                          if c in nodes and not nodes[c]["folder"] and not nodes[c]["mime"].startswith("image/"))
+        return imgs >= 10 and imgs / len(files) >= 0.75 and direct_docs <= 3
 
-    with ThreadPoolExecutor(6) as ex:
-        results = list(ex.map(check, rows))
-    bad = [(r, s) for r, s in results if s != "ok"]
-    print(f"verified {len(rows) - len(bad)}/{len(rows)} links publicly reachable")
-    for r, s in bad:
-        print(f"  {r['code']} | {r['drive_name']} | {s}")
-    rows = [r for r, s in results if s == "ok"] if "--drop-bad" in sys.argv else rows
+    rows: list[dict] = []
 
-out = Path(__file__).parent / "drive-import.csv"
-with out.open("w", newline="", encoding="utf-8-sig") as f:
-    w = csv.writer(f)
-    w.writerow(["code", "name_ar", "name_en", "type", "title", "url"])
-    for r in rows:
-        w.writerow([r["code"], r["name_ar"], r["name_en"], r["type"], r["title"], r["url"]])
-print(f"wrote {len(rows)} rows for {len(COURSES)} courses -> {out}")
-from collections import Counter
-print("types:", dict(Counter(r["type"] for r in rows)))
+    def add(code: str, segs: list[str], name: str, url: str, mime: str, kind_hint: str = "") -> None:
+        inner = segs[1:]  # path below the course folder
+        cleaned = [clean(s) for s in inner]
+        rtype = classify(cleaned, name, mime) if not kind_hint else kind_hint
+        # Section: path below the course folder, minus the generic category folder ("الاختبارات", "المصادر"...).
+        generic = r"^(الاختبارات|اختبارات|المصادر|الشرائح|الكتب|التمارين|شروح)$"
+        sec_parts = cleaned[1:] if cleaned and re.match(generic, cleaned[0]) else cleaned
+        section = " / ".join(p for p in sec_parts if p)[:120]
+        rows.append({"code": code, "type": rtype, "title": title_of(name), "url": url, "section": section,
+                     "has_solutions": "1" if rtype == "exams" and solved(name, section) else ""})
+
+    def walk(fid: str, code: str) -> None:
+        node = nodes[fid]
+        segs = node["path"][1:] + [node["name"]]  # from the course folder down
+        for c in node["children"]:
+            n = nodes.get(c)
+            if not n or c == fid or any(s in n["name"] for s in SKIP_NAMES) or re.match(SKIP_RE, n["name"]):
+                continue
+            if n["folder"]:
+                if len(segs) >= 2 and image_heavy(c):  # never collapse a whole category folder
+                    count = len(files_under(c))
+                    add(code, segs + [n["name"]], f"{clean(n['name'])} (مجلد صور، {count} ملف)",
+                        f"https://drive.google.com/drive/folders/{c}", "image/folder")
+                else:
+                    walk(c, code)
+            elif n["mime"] != "application/vnd.google-apps.shortcut":
+                add(code, segs, n["name"], file_url(n), n["mime"])
+
+    seen_codes = set()
+    for level_id in nodes[ROOT]["children"]:
+        level = nodes[level_id]
+        if not (level["folder"] and level["name"].startswith("مقررات")):
+            continue
+        for cid in level["children"]:
+            course = nodes[cid]
+            m = re.match(r"\s*([؀-ۿ]+)\s*(\d{3})", course["name"])
+            if not (course["folder"] and m) or not files_under(cid):
+                continue
+            code = f"{m.group(1)} {m.group(2)}"
+            if code not in seen_codes:
+                seen_codes.add(code)
+                rows.append({"code": code, "type": "other", "title": "مجلد المقرر كاملاً على Google Drive",
+                             "url": f"https://drive.google.com/drive/folders/{cid}", "section": "", "has_solutions": ""})
+            walk(cid, code)
+    return rows
+
+
+def main() -> None:
+    if "--cached" in sys.argv and CACHE.exists():
+        nodes = json.loads(CACHE.read_text(encoding="utf-8"))
+    else:
+        nodes = crawl()
+        CACHE.write_text(json.dumps(nodes, ensure_ascii=False), encoding="utf-8")
+    rows = build(nodes)
+    urls = Counter(r["url"] for r in rows)
+    rows = [r for i, r in enumerate(rows) if urls[r["url"]] == 1 or r["url"] not in {x["url"] for x in rows[:i]}]
+    with OUT.open("w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow(["code", "name_ar", "name_en", "type", "title", "url", "has_solutions", "section", "description"])
+        for r in rows:
+            w.writerow([r["code"], "", "", r["type"], r["title"], r["url"], r["has_solutions"], r["section"], ""])
+    print(f"wrote {len(rows)} rows for {len({r['code'] for r in rows})} courses -> {OUT}")
+    print("types:", dict(Counter(r["type"] for r in rows)))
+    print("with solutions:", sum(1 for r in rows if r["has_solutions"]))
+
+
+if __name__ == "__main__":
+    main()

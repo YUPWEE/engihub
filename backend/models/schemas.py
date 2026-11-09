@@ -88,6 +88,7 @@ class Resource(BaseModel):
     type: ResourceType
     has_solutions: bool = False
     description: str = ""
+    section: str = ""  # optional sub-heading inside the type group (e.g. "Finals"); set by bulk import
     kind: Literal["pdf", "link"]
     url: Optional[str] = None
     source: Source
@@ -105,6 +106,7 @@ class ResourceUpdate(BaseModel):
     has_solutions: bool = False
     description: str = Field(default="", max_length=500)
     url: Optional[str] = None
+    section: Optional[str] = Field(default=None, max_length=120)  # None = leave unchanged
 
 
 class HelpfulOut(BaseModel):

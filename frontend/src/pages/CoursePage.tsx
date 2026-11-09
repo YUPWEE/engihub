@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AddResourceDialog, type AddKind } from "@/components/AddResourceDialog";
 import { EmptyState } from "@/components/Cards";
@@ -13,8 +13,23 @@ import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { altCode, altName, courseCode, courseName, errorKey, useAdmin, useCatalog } from "@/lib/queries";
 import { RESOURCE_TYPES, TYPE_META } from "@/lib/resourceMeta";
-import type { Course, CourseDetail, CourseUpdate, OkOut } from "@/lib/types";
+import type { Course, CourseDetail, CourseUpdate, OkOut, Resource, ResourceType } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const collator = new Intl.Collator(["ar", "en"], { numeric: true, sensitivity: "base" });
+
+// Split one type group into sub-sections (e.g. Drive folders such as "النهائية"). Items without a section keep
+// their order and come first; sectioned items are sorted naturally (exams newest first, everything else 1→n).
+function sectionsOf(items: Resource[], type: ResourceType): [string, Resource[]][] {
+  const map = new Map<string, Resource[]>();
+  for (const r of items) {
+    const k = r.section ?? "";
+    map.set(k, [...(map.get(k) ?? []), r]);
+  }
+  const dir = type === "exams" ? -1 : 1;
+  for (const [k, list] of map) if (k) list.sort((a, b) => dir * collator.compare(a.title, b.title));
+  return [...map.entries()].sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : collator.compare(a, b)));
+}
 
 // Guard against StrictMode's double effect run counting one visit twice.
 let lastOpen = { id: "", t: 0 };
@@ -155,11 +170,30 @@ export default function CoursePage() {
                   {t(TYPE_META[g.type].label)}
                   <span className="text-sm font-normal text-muted-foreground">({g.items.length})</span>
                 </h2>
-                <ul className="space-y-2">
-                  {g.items.map((r) => (
-                    <ResourceItem key={r.id} r={r} courseId={id} />
-                  ))}
-                </ul>
+                <div className="space-y-2">
+                  {sectionsOf(g.items, g.type).map(([name, items]) =>
+                    name ? (
+                      <details key={name} open={g.items.length <= 12} className="group rounded-xl border border-border/70" data-testid="resource-section">
+                        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+                          <span className="min-w-0 flex-1 truncate">{name}</span>
+                          <span className="text-xs font-normal text-muted-foreground">{items.length}</span>
+                        </summary>
+                        <ul className="space-y-2 px-2 pb-2">
+                          {items.map((r) => (
+                            <ResourceItem key={r.id} r={r} courseId={id} />
+                          ))}
+                        </ul>
+                      </details>
+                    ) : (
+                      <ul key="" className="space-y-2">
+                        {items.map((r) => (
+                          <ResourceItem key={r.id} r={r} courseId={id} />
+                        ))}
+                      </ul>
+                    ),
+                  )}
+                </div>
               </section>
             );
           })

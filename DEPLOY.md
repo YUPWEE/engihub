@@ -64,6 +64,13 @@ account; otherwise the deployment shows as **BLOCKED**. Commit as that account, 
 address for the account). Commits authored with any other email (such as a different GitHub account's) are skipped.
 
 ## Bulk-adding resource links
-Dashboard -> Import / Export -> "Import resource links from CSV". Columns: `code,name_ar,name_en,type,title,url`.
-`data/drive-import.csv` is the set built from the shared KSU Drive (see `data/build_drive_import.py`). Create any missing
-branch first (e.g. NJM); re-uploading is safe, existing links are skipped.
+Dashboard -> Import / Export -> "Import resource links from CSV". Columns: `code,name_ar,name_en,type,title,url`, then
+optionally `has_solutions` (1 for solved exams), `section` (a sub-heading inside the type group on the course page, e.g.
+"النهائية") and `description`. Create any missing branch first (e.g. NJM). Re-uploading is safe: links already on a course
+are skipped. Thousands of rows import in a couple of seconds.
+
+`data/drive-import.csv` is the shared KSU Drive, file by file (about 1,800 links for 24 courses), built by
+`python -I data/build_drive_import.py`, which crawls the public folder anonymously and decides type, section and
+"solved" from folder and file names. Photo-only folders become one folder link, each course also gets a link to its whole
+Drive folder, and grade sheets, credit pages and the non-course "أدلة الكلية" folder are skipped. Re-run it later to pick
+up new files, then import the CSV again: only new links are added.

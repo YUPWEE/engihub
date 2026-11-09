@@ -65,6 +65,7 @@ export interface Resource {
   type: ResourceType;
   has_solutions: boolean;
   description: string;
+  section?: string; // optional sub-heading inside the type group (set by bulk import)
   kind: "pdf" | "link";
   url: string | null;
   source: Source;
@@ -82,6 +83,7 @@ export interface ResourceUpdate {
   has_solutions: boolean;
   description: string;
   url: string | null;
+  section?: string | null; // omitted/null = unchanged
 }
 
 export interface HelpfulOut {

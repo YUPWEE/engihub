@@ -42,7 +42,7 @@ async def _wanted() -> dict[str, str]:
         c = courses.get(r["course_id"])
         if not c:
             continue
-        out[f"r:{r['id']}"] = (f"{r['title']}. {r.get('description', '')}. type: {r['type']}. "
+        out[f"r:{r['id']}"] = (f"{r['title']}. {r.get('section', '')}. {r.get('description', '')}. type: {r['type']}. "
                                f"course: {course_text(c)}")
     return out
 
