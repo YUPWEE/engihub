@@ -47,18 +47,20 @@ Models default to `gemini-3.5-flash-lite` (screening) and `gemini-embedding-2` (
 Google's pricing page; override with `GEMINI_TEXT_MODEL` / `GEMINI_EMBED_MODEL` if Google retires them.
 
 Limits and privacy:
-- Spend is capped per server run and per UTC day (`GEMINI_DAILY_SEARCH` 300 search calls, `GEMINI_DAILY_OTHER` 200 for
-  screening and indexing); over the cap the features quietly switch off for the day. Search is also rate-limited per
+- Spend is capped per server run and per day (see "Indexing speed" below for the embedding caps; `GEMINI_DAILY_OTHER` 200 for
+  submission screening); over a cap that feature quietly switches off for the day. Search is also rate-limited per
   visitor, and identical queries are cached.
 - On the free tier Google may use the content sent to improve its products. What is sent: search text typed by visitors,
   and the titles, descriptions, link addresses and course names of resources (all public on the site anyway). PDF contents
   are never sent. Mention it in your privacy note if you have one.
 - `SEARCH_MIN_SCORE` (default 0.35) and the 0.12 closeness window in `lib/semantic.py` decide how strict suggestions are;
   tune them after trying real queries.
-- Indexing speed: the free tier allows only a couple of embedding calls (50 items each) per minute, so a big import
-  (e.g. the ~1,800 Drive links) takes about 25-30 minutes to become searchable. The sync waits out each "too many
-  requests" pause and carries on by itself; the admin AI card shows progress. While it pauses, AI search briefly
-  falls back to keyword-only results.
+- Indexing speed: on the free tier every text in a batch counts as one request, and the embedding quota is about
+  100 per minute and 1,000 per day (Google's day ends at midnight Pacific, 11:00 in Riyadh). Indexing is capped at 750
+  items a day (`GEMINI_DAILY_INDEX_ITEMS`) so visitors' searches (`GEMINI_DAILY_SEARCH`, 200) always have quota left. A
+  big import such as the ~1,800 Drive links therefore becomes fully searchable over two to three days: the sync waits out
+  each limit, retries every 30 minutes until done, and also resumes when the free instance wakes up. The admin AI card
+  shows progress and the last Gemini error. Until an item is indexed, keyword search still finds it.
 - Tests: `cd backend && python -m pytest tests/test_ai.py tests/test_import.py -n 0` (Gemini is faked, no key needed).
 
 ## Gotcha: Vercel blocks commits from other identities

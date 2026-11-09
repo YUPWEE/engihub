@@ -49,7 +49,8 @@ async def api(monkeypatch):
     security._buckets.clear()  # rate-limit counters are per process; start each test fresh
     semantic._pending, semantic._dirty = None, False  # a task left on a previous test's (closed) event loop
     calls.clear()
-    gemini._used.update(search=0, other=0)
+    for k in gemini._used:
+        gemini._used[k] = 0
     gemini._cooldown_until = 0.0
     semantic._query_cache.clear()
     async with app.router.lifespan_context(app):
@@ -159,6 +160,17 @@ async def test_sync_waits_out_refusals_and_finishes(api, monkeypatch):
     out = await semantic.sync()
     assert refusals["left"] == 0 and out["embedded"] == out["total"]
     assert await db.embeddings.count_documents({}) == out["total"]
+
+
+async def test_indexing_stops_at_daily_cap_and_leaves_room_for_search(api, monkeypatch):
+    c = await first_course(api)
+    for n in range(8):
+        await add_link(api, c["id"], f"Lecture {n} slides")
+    await db.embeddings.delete_many({})
+    monkeypatch.setenv("GEMINI_DAILY_INDEX_ITEMS", "5")
+    out = await semantic.sync()
+    assert out["embedded"] == 5 and out["pending"] == out["total"] - 5
+    assert (await api.get("/search", params={"q": "lecture slides"})).json()["ai"] is True  # search has its own budget
 
 
 async def test_edit_during_running_sync_is_not_lost(api, monkeypatch):

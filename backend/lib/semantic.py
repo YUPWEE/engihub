@@ -21,6 +21,7 @@ _query_cache: "OrderedDict[str, list[float]]" = OrderedDict()
 _dirty = False
 RETRY_WAIT = 65.0  # seconds; the free tier limits requests and tokens per minute
 MAX_SYNC_FAILURES = 6
+RESUME_AFTER = 30 * 60  # seconds before an incomplete sync (quota used up) tries again
 
 
 def _min_score() -> float:
@@ -58,7 +59,7 @@ async def sync() -> dict[str, int]:
     """Bring stored embeddings in line with the catalog: embed what is new or changed, drop what is gone."""
     global _vectors
     if not gemini.enabled():
-        return {"embedded": 0, "removed": 0, "total": 0}
+        return {"embedded": 0, "removed": 0, "total": 0, "pending": 0}
     async with _lock:
         wanted = await _wanted()
         have = {d["_id"]: d["h"] for d in await db.embeddings.find({}, {"h": 1}).to_list(200000)}
@@ -69,6 +70,12 @@ async def sync() -> dict[str, int]:
         done, i, batch, failures = 0, 0, gemini.EMBED_BATCH, 0
         while i < len(stale):
             keys = stale[i:i + batch]
+            if gemini.budget_left("index") < len(keys):
+                batch = max(1, gemini.budget_left("index"))
+                if gemini.budget_left("index") == 0:
+                    logger.info("embedding sync paused: today's indexing budget is used (%d left)", len(stale) - i)
+                    break
+                continue
             vecs = await gemini.embed([wanted[k] for k in keys], query=False)
             if vecs is None:
                 # Free-tier per-minute limits (or a transient error): wait it out, then retry smaller.
@@ -90,7 +97,7 @@ async def sync() -> dict[str, int]:
             _vectors = None  # searches see new items as they arrive
         _vectors = None
         logger.info("embedding sync: %d embedded, %d removed, %d total", done, len(gone), len(wanted))
-        return {"embedded": done, "removed": len(gone), "total": len(wanted)}
+        return {"embedded": done, "removed": len(gone), "total": len(wanted), "pending": len(stale) - done}
 
 
 def schedule_sync(delay: float = 5.0) -> None:
@@ -109,7 +116,10 @@ def schedule_sync(delay: float = 5.0) -> None:
             while _dirty:
                 _dirty = False
                 await asyncio.sleep(delay)
-                await sync()
+                result = await sync()
+                if result["pending"] and not _dirty:  # quota ran out: try again later until everything is indexed
+                    await asyncio.sleep(RESUME_AFTER)
+                    _dirty = True
         except Exception as exc:  # background job: never crash the app
             logger.error("embedding sync failed: %s", exc)
 

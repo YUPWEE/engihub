@@ -10,6 +10,7 @@ import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -45,9 +46,13 @@ def embed_dim() -> int:
     return max(128, min(3072, _env_int("GEMINI_EMBED_DIM", 384)))
 
 
-# ---------- budget: stay well inside the free quota; resets each UTC day and on restart ----------
-_BUDGET_ENV = {"search": ("GEMINI_DAILY_SEARCH", 300), "other": ("GEMINI_DAILY_OTHER", 200)}
-_used: dict[str, int] = {"search": 0, "other": 0}
+# ---------- budget: stay inside the free quota; resets with Google's day (midnight Pacific) and on restart ----------
+# Units: one embedded text (each item of a batch counts as a request on the free tier) or one text-model call.
+# Indexing is capped below the ~1,000/day embedding quota so visitors' searches always have some left.
+_BUDGET_ENV = {"search": ("GEMINI_DAILY_SEARCH", 200), "index": ("GEMINI_DAILY_INDEX_ITEMS", 750),
+               "other": ("GEMINI_DAILY_OTHER", 200)}
+_used: dict[str, int] = {"search": 0, "index": 0, "other": 0}
+_QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 _used_day = ""
 _cooldown_until = 0.0  # set after a 429 so we stop hammering
 _last_error = ""  # last API failure (status + Google's message; never the key), shown to the admin
@@ -60,18 +65,24 @@ def _limit(bucket: str) -> int:
 
 def _roll_day() -> None:
     global _used_day
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(_QUOTA_TZ).date().isoformat()
     if today != _used_day:
         _used_day = today
-        _used.update(search=0, other=0)
+        for k in _used:
+            _used[k] = 0
 
 
-def _spend(bucket: str) -> bool:
+def _spend(bucket: str, units: int = 1) -> bool:
     _roll_day()
-    if time.monotonic() < _cooldown_until or _used[bucket] >= _limit(bucket):
+    if time.monotonic() < _cooldown_until or _used[bucket] + units > _limit(bucket):
         return False
-    _used[bucket] += 1
+    _used[bucket] += units
     return True
+
+
+def budget_left(bucket: str) -> int:
+    _roll_day()
+    return max(0, _limit(bucket) - _used[bucket])
 
 
 def cooldown_left() -> float:
@@ -125,7 +136,7 @@ def _normalize(v: list[float]) -> list[float]:
     return [round(x / n, 5) for x in v]
 
 
-async def embed(texts: list[str], *, query: bool, bucket: str = "other") -> Optional[list[list[float]]]:
+async def embed(texts: list[str], *, query: bool, bucket: str = "index") -> Optional[list[list[float]]]:
     """Unit-length embedding vectors, one per text (None if AI is unavailable). `gemini-embedding-2` takes no
     task_type, so the task is stated in a text prefix instead."""
     if not texts or not enabled():
@@ -133,7 +144,7 @@ async def embed(texts: list[str], *, query: bool, bucket: str = "other") -> Opti
     out: list[list[float]] = []
     for i in range(0, len(texts), EMBED_BATCH):
         chunk = texts[i:i + EMBED_BATCH]
-        if not _spend(bucket):
+        if not _spend(bucket, len(chunk)):
             return None
         reqs = [{
             "model": f"models/{embed_model()}",
