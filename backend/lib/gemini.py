@@ -154,6 +154,7 @@ async def embed(texts: list[str], *, query: bool, bucket: str = "index") -> Opti
         data = await _post(f"models/{embed_model()}:batchEmbedContents", {"requests": reqs})
         vecs = [e.get("values") for e in (data or {}).get("embeddings", [])]
         if len(vecs) != len(chunk) or not all(isinstance(v, list) and v for v in vecs):
+            _used[bucket] = max(0, _used[bucket] - len(chunk))  # refused or failed: Google did not count it either
             return None
         out.extend(_normalize(v) for v in vecs)
     return out
