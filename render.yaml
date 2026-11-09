@@ -27,5 +27,7 @@ services:
         value: "300"
       - key: APP_TZ
         value: Asia/Riyadh
+      - key: GEMINI_API_KEY     # optional: free Google AI Studio key; enables AI search + submission screening
+        sync: false
       - key: CLIENT_IP_HEADER   # visitor address for rate limits: set (and overwritten) by Vercel on every request.
         value: x-vercel-forwarded-for # Measured chain on Render: client, Vercel egress, Cloudflare, Render (positions are not stable).

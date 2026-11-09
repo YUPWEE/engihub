@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Sparkles } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { altCode, courseCode, courseName, useCatalog } from "@/lib/queries";
+import { altCode, courseCode, courseName, useAiSearch, useCatalog } from "@/lib/queries";
 import { buildIndex, searchCourses } from "@/lib/search";
 import type { Course } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,13 @@ interface Props {
   testid: string;
   onEnterNoMatch?: (q: string) => void;
   onAddCourse?: (q: string) => void;
+}
+
+// One row in the dropdown: a course, or (title set) a resource found by AI search that opens its course.
+interface AiOption {
+  key: string;
+  course: Course;
+  title?: string;
 }
 
 export function useSearchIndex() {
@@ -32,6 +39,16 @@ export function SearchBox({ value, onChange, placeholder, size = "md", branchId,
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const results = useMemo(() => searchCourses(index, value, 8, branchId), [index, value, branchId]);
+  const ai = useAiSearch(value);
+  // AI suggestions come after the keyword matches, de-duplicated and kept inside the current branch filter.
+  const aiOptions = useMemo<AiOption[]>(() => {
+    const seen = new Set(results.map((c) => c.id));
+    const inBranch = (c: Course) => !branchId || c.branch_id === branchId;
+    const courses = (ai.data?.courses ?? []).filter((c) => !seen.has(c.id) && inBranch(c)).map((c) => ({ key: `c${c.id}`, course: c }));
+    const resources = (ai.data?.resources ?? []).filter((r) => inBranch(r.course)).map((r) => ({ key: `r${r.resource.id}`, course: r.course, title: r.resource.title }));
+    return [...courses, ...resources];
+  }, [ai.data, results, branchId]);
+  const options: AiOption[] = [...results.map((c) => ({ key: c.id, course: c })), ...aiOptions];
   const branchCode = (c: Course) => data?.branches.find((b) => b.id === c.branch_id);
   const show = open && value.trim().length > 0;
 
@@ -44,13 +61,13 @@ export function SearchBox({ value, onChange, placeholder, size = "md", branchId,
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setOpen(true);
-      setActive((a) => Math.min(a + 1, results.length - 1));
+      setActive((a) => Math.min(a + 1, options.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (results[active]) pick(results[active]);
+      if (options[active]) pick(options[active].course);
       else if (value.trim()) onEnterNoMatch?.(value);
     } else if (e.key === "Escape") {
       setOpen(false);
@@ -94,7 +111,7 @@ export function SearchBox({ value, onChange, placeholder, size = "md", branchId,
         {lg && (
           <button
             type="button"
-            onClick={() => (results[0] ? pick(results[0]) : value.trim() && onEnterNoMatch?.(value))}
+            onClick={() => (options[0] ? pick(options[0].course) : value.trim() && onEnterNoMatch?.(value))}
             className="hidden rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors duration-200 hover:bg-primary/90 sm:block"
             data-testid={`${testid}-submit`}
           >
@@ -108,7 +125,12 @@ export function SearchBox({ value, onChange, placeholder, size = "md", branchId,
           className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-popover shadow-2xl animate-drop"
           data-testid={`${testid}-suggestions`}
         >
-          {results.length === 0 ? (
+          {options.length === 0 && ai.loading ? (
+            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground" data-testid={`${testid}-ai-loading`}>
+              <Sparkles className="size-4 text-sage" />
+              {t("aiSearching")}
+            </div>
+          ) : options.length === 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm text-muted-foreground">
               <span data-testid={`${testid}-no-results`}>{t("noSuggestions")}</span>
               {onAddCourse && (
@@ -126,30 +148,46 @@ export function SearchBox({ value, onChange, placeholder, size = "md", branchId,
             </div>
           ) : (
             <ul className="max-h-80 overflow-y-auto py-1">
-              {results.map((c, i) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={i === active}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setActive(i)}
-                    onClick={() => pick(c)}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-4 py-2.5 text-start transition-colors duration-150",
-                      i === active ? "bg-accent" : "hover:bg-accent/60",
+              {options.map((o, i) => {
+                const c = o.course;
+                return (
+                  <li key={o.key}>
+                    {i === results.length && aiOptions.length > 0 && (
+                      <div className="flex items-center gap-1.5 border-t border-border px-4 pb-1 pt-2.5 text-xs text-muted-foreground" data-testid={`${testid}-ai-heading`}>
+                        <Sparkles className="size-3.5 text-sage" />
+                        {t("aiSuggestions")}
+                      </div>
                     )}
-                    data-testid={`${testid}-option-${i}`}
-                  >
-                    <span className="code-text min-w-[5.5rem] font-bold text-sage">{courseCode(c, lang)}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm">{courseName(c, lang)}</span>
-                    <span dir="ltr" className="hidden text-xs text-muted-foreground sm:inline">
-                      {altCode(c, lang)}
-                    </span>
-                    <span className="sr-only">{branchCode(c)?.name_en}</span>
-                  </button>
-                </li>
-              ))}
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={i === active}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => setActive(i)}
+                      onClick={() => pick(c)}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-4 py-2.5 text-start transition-colors duration-150",
+                        i === active ? "bg-accent" : "hover:bg-accent/60",
+                      )}
+                      data-testid={`${testid}-option-${i}`}
+                    >
+                      <span className="code-text min-w-[5.5rem] font-bold text-sage">{courseCode(c, lang)}</span>
+                      {o.title ? (
+                        <span className="min-w-0 flex-1 text-sm">
+                          <span className="block truncate">{o.title}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{courseName(c, lang)}</span>
+                        </span>
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate text-sm">{courseName(c, lang)}</span>
+                      )}
+                      <span dir="ltr" className="hidden text-xs text-muted-foreground sm:inline">
+                        {altCode(c, lang)}
+                      </span>
+                      <span className="sr-only">{branchCode(c)?.name_en}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

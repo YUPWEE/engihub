@@ -31,6 +31,10 @@ class SiteSettings(BaseModel):
     contact_url: str
 
 
+class PublicSettings(SiteSettings):
+    ai_search: bool = False  # true when the server has an AI key, so the UI offers meaning-based search
+
+
 # ---------- branches ----------
 class BranchIn(BaseModel):
     code_ar: str = Field(min_length=1, max_length=12)
@@ -178,6 +182,12 @@ class ResourceWithCourse(BaseModel):
     count: int = 0
 
 
+class SearchOut(BaseModel):
+    ai: bool  # false -> AI search unavailable right now; the client keeps its keyword results
+    courses: list[Course] = []
+    resources: list[ResourceWithCourse] = []
+
+
 class HomeStats(BaseModel):
     top_courses: list[TopCourse]
     top_courses_fallback: bool
@@ -210,6 +220,16 @@ class AdminOverview(BaseModel):
     broken: list[ResourceWithCourse]
     storage: StorageInfo
     counts: AdminCounts
+
+
+class AIStatus(BaseModel):
+    enabled: bool
+    indexed: int
+    total: int
+    text_model: str
+    embed_model: str
+    calls_used: int
+    calls_limit: int
 
 
 class ImportIn(BaseModel):

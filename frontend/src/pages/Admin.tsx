@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { courseCode, errorKey, formatBytes, formatDate, useAdminStatus, useCatalog, useSettings } from "@/lib/queries";
-import type { AdminOverview, Branch, BranchIn, ImportIn, ImportResourcesResult, ImportResult, OkOut, SiteSettings } from "@/lib/types";
+import type { AdminOverview, AIStatus, Branch, BranchIn, ImportIn, ImportResourcesResult, ImportResult, OkOut, SiteSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function Stat({ label, value, testid }: { label: string; value: string | number; testid: string }) {
@@ -20,6 +20,36 @@ function Stat({ label, value, testid }: { label: string; value: string | number;
     <div className="rounded-2xl border border-border bg-card p-4" data-testid={testid}>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function AiCard() {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["admin-ai"], queryFn: () => apiGet<AIStatus>("/admin/ai") });
+  const reindex = useMutation({
+    mutationFn: () => apiPost<AIStatus>("/admin/ai/reindex"),
+    onSuccess: (s) => {
+      qc.setQueryData(["admin-ai"], s);
+      toast.success(t("aiReindexed"));
+    },
+    onError: (e) => toast.error(t(errorKey(e))),
+  });
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5" data-testid="admin-ai-card">
+      <h3 className="font-semibold">{t("aiCardTitle")}</h3>
+      <p className="mt-1 text-xs text-muted-foreground">{t("aiCardHint")}</p>
+      {data && (
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="admin-ai-status">
+          {data.enabled ? t("aiOn", { i: data.indexed, n: data.total, u: data.calls_used, l: data.calls_limit }) : t("aiOff")}
+        </p>
+      )}
+      <Button type="button" variant="outline" size="sm" className="mt-4" disabled={!data?.enabled || reindex.isPending}
+        onClick={() => reindex.mutate()} data-testid="admin-ai-reindex">
+        <RefreshCw className={cn("size-3.5", reindex.isPending && "animate-spin")} />
+        {t("aiReindex")}
+      </Button>
     </div>
   );
 }
@@ -313,6 +343,7 @@ export default function Admin() {
               </div>
             )}
           </div>
+          <AiCard />
           <div className="rounded-2xl border border-border bg-card p-5">
             <h3 className="font-semibold">{t("exportJson")}</h3>
             <p className="mt-1 text-xs text-muted-foreground">{t("exportHint")}</p>

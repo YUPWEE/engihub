@@ -13,6 +13,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 from lib.db import client, ensure_indexes  # noqa: E402
+from lib import semantic  # noqa: E402
 from lib.linkcheck import link_check_loop  # noqa: E402
 from lib.seed import seed_if_empty  # noqa: E402
 from routers import admin as admin_routes  # noqa: E402
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
     await ensure_indexes()
     await seed_if_empty()
     app.state.link_task = asyncio.create_task(link_check_loop())
+    semantic.schedule_sync(delay=20)  # index anything new since the last start (no-op without an AI key)
     yield
     app.state.link_task.cancel()
     with suppress(asyncio.CancelledError):

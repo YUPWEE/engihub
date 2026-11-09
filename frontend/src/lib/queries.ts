@@ -1,8 +1,9 @@
 // TanStack Query hooks + small helpers shared by pages.
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiGet } from "./api";
 import { isTKey, type Lang, type TKey } from "./i18n";
-import type { AdminMe, Catalog, Course, SiteSettings } from "./types";
+import type { AdminMe, Catalog, Course, SearchOut, SiteSettings } from "./types";
 
 const CATALOG_KEY = "engihub_catalog_v1";
 let cacheMemo: { t: number; data: Catalog } | null | undefined;
@@ -43,7 +44,32 @@ export function useSettings() {
   return useQuery({ queryKey: ["settings"], queryFn: () => apiGet<SiteSettings>("/settings"), staleTime: 5 * 60_000 });
 }
 
-export function useAdminStatus(): { admin: boolean; loading: boolean } {
+// Meaning-based search, layered on top of the instant keyword search. Debounced; silently absent when the
+// server has no AI key, hits its daily budget, or errors.
+export function useAiSearch(query: string): { data?: SearchOut; loading: boolean } {
+  const { data: settings } = useSettings();
+  const trimmed = query.trim();
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(trimmed), 450);
+    return () => clearTimeout(id);
+  }, [trimmed]);
+  const enabled = !!settings?.ai_search && debounced.length >= 3;
+  const q = useQuery({
+    queryKey: ["ai-search", debounced],
+    queryFn: () => apiGet<SearchOut>(`/search?q=${encodeURIComponent(debounced)}`),
+    enabled,
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+  const current = enabled && debounced === trimmed;
+  return {
+    data: current && q.data?.ai ? q.data : undefined,
+    loading: !!settings?.ai_search && trimmed.length >= 3 && (debounced !== trimmed || q.isFetching),
+  };
+}
+
+export function useAdminStatus():{ admin: boolean; loading: boolean } {
   const { data, isPending } = useQuery({
     queryKey: ["admin-me"],
     queryFn: () => apiGet<AdminMe>("/admin/me"),

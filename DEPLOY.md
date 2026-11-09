@@ -32,6 +32,31 @@ Order matters: database, then API, then site.
   Limitation: anyone who calls the Render URL directly can set that header themselves. The admin login stays protected
   either way, since failed logins are also capped globally.
 
+## AI features (optional, free Gemini API)
+Two things, both off until a key is set:
+- **Smart search**: the home search box also suggests courses and resources by meaning (e.g. "past papers for statics"),
+  under an "AI search suggestions" heading below the normal keyword matches.
+- **Submission screening**: each new public link, PDF and study group is checked by the text model. A suspicious one gets a
+  report in the dashboard (note starts with `AI:`) and stays visible until the admin decides. Nothing is hidden or deleted
+  automatically, and if the AI is down the item is simply not screened.
+
+Setup: create a key at https://aistudio.google.com/apikey (no billing needed), add it in Render -> engihub-api ->
+Environment as `GEMINI_API_KEY`, and let it redeploy. Then in the dashboard (Import / Export -> "AI features") the card
+should say "On"; press "Update search index" once (the first sync also runs ~20 s after each start).
+Models default to `gemini-3.5-flash-lite` (screening) and `gemini-embedding-2` (search), both listed as free-tier on
+Google's pricing page; override with `GEMINI_TEXT_MODEL` / `GEMINI_EMBED_MODEL` if Google retires them.
+
+Limits and privacy:
+- Spend is capped per server run and per UTC day (`GEMINI_DAILY_SEARCH` 300 search calls, `GEMINI_DAILY_OTHER` 200 for
+  screening and indexing); over the cap the features quietly switch off for the day. Search is also rate-limited per
+  visitor, and identical queries are cached.
+- On the free tier Google may use the content sent to improve its products. What is sent: search text typed by visitors,
+  and the titles, descriptions, link addresses and course names of resources (all public on the site anyway). PDF contents
+  are never sent. Mention it in your privacy note if you have one.
+- `SEARCH_MIN_SCORE` (default 0.35) and the 0.12 closeness window in `lib/semantic.py` decide how strict suggestions are;
+  tune them after trying real queries.
+- Tests: `cd backend && python -m pytest tests/test_ai.py -n 0` (Gemini is faked, no key needed).
+
 ## Gotcha: Vercel blocks commits from other identities
 On Vercel's free (Hobby) plan, a push is only deployed if the commit's author is the GitHub account linked to the Vercel
 account; otherwise the deployment shows as **BLOCKED**. Commit as that account, e.g. in this repo:

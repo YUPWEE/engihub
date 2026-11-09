@@ -7,7 +7,7 @@ from typing import get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from lib import storage
+from lib import semantic, storage
 from lib.catalog import (
     aware, branch_map, courses_by_ids, get_course_doc, match_branch, to_course, to_resource, to_session,
     validate_course_fields,
@@ -20,7 +20,7 @@ from lib.security import (
 )
 from lib.textnorm import detect_source, is_personal_contact, norm_number, split_code, valid_https
 from models.schemas import (
-    AdminCounts, AdminLogin, AdminMe, AdminOverview, Branch, BranchIn, Course, CourseUpdate, ImportIn,
+    AdminCounts, AdminLogin, AdminMe, AdminOverview, AIStatus, Branch, BranchIn, Course, CourseUpdate, ImportIn,
     ImportResourcesResult, ImportResult, OkOut, Report, ReportOut, Resource, ResourceType, ResourceUpdate,
     ResourceWithCourse, StorageInfo, SiteSettings, StudySession, StudySessionUpdate, new_id,
 )
@@ -123,6 +123,19 @@ async def trigger_link_check():
     return OkOut()
 
 
+# ---------- AI (Gemini) ----------
+@guarded.get("/ai", response_model=AIStatus)
+async def ai_status():
+    return AIStatus(**await semantic.status())
+
+
+@guarded.post("/ai/reindex", response_model=AIStatus)
+async def ai_reindex():
+    """Embed anything new or changed so AI search can find it (also runs on its own after edits)."""
+    await semantic.sync()
+    return AIStatus(**await semantic.status())
+
+
 # ---------- resources ----------
 async def _delete_resource_docs(query: dict) -> None:
     docs = await db.resources.find(query, {"_id": 0, "id": 1, "file_name": 1}).to_list(100000)
@@ -131,6 +144,7 @@ async def _delete_resource_docs(query: dict) -> None:
     ids = [d["id"] for d in docs]
     await db.resources.delete_many({"id": {"$in": ids}})
     await db.reports.delete_many({"target_type": "resource", "target_id": {"$in": ids}})
+    semantic.schedule_sync()
 
 
 @guarded.patch("/resources/{resource_id}", response_model=Resource)
@@ -148,6 +162,7 @@ async def update_resource(resource_id: str, body: ResourceUpdate):
             raise HTTPException(status_code=400, detail="invalid_url")
         upd.update(url=url, source=detect_source(url), link_status="unknown", reported_broken=False)
     await db.resources.update_one({"id": resource_id}, {"$set": upd})
+    semantic.schedule_sync()
     return to_resource({**doc, **upd})
 
 
@@ -190,6 +205,7 @@ async def update_course(course_id: str, body: CourseUpdate):
     num = await validate_course_fields(body.branch_id, body.number, body.name_ar, body.name_en, exclude_id=course_id)
     upd = {"branch_id": body.branch_id, "number": num, "name_ar": body.name_ar.strip(), "name_en": body.name_en.strip()}
     await db.courses.update_one({"id": course_id}, {"$set": upd})
+    semantic.schedule_sync()
     return to_course({**doc, **upd}, await branch_map())
 
 
@@ -202,6 +218,7 @@ async def delete_course(course_id: str):
     await db.reports.delete_many({"target_type": "session", "target_id": {"$in": ses_ids}})
     await db.events.delete_many({"target_id": course_id})
     await db.courses.delete_one({"id": course_id})
+    semantic.schedule_sync()
     return OkOut()
 
 
@@ -273,6 +290,7 @@ async def import_courses(body: ImportIn):
         await db.courses.insert_one({"id": new_id(), "branch_id": branch.id, "number": num,
                                      "name_ar": name_ar.strip(), "name_en": name_en.strip()})
         created += 1
+    semantic.schedule_sync()
     return ImportResult(created=created, skipped=skipped, errors=errors[:100])
 
 
@@ -323,6 +341,7 @@ async def import_resources(body: ImportIn):
                        kind="link", url=url, source=detect_source(url), link_status="unknown")
         await db.resources.insert_one(res.model_dump())
         resources_created += 1
+    semantic.schedule_sync()
     return ImportResourcesResult(courses_created=courses_created, resources_created=resources_created,
                                  skipped=skipped, errors=errors[:100])
 

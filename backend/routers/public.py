@@ -4,10 +4,10 @@ from datetime import date, timedelta
 from typing import Literal, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 
-from lib import storage
+from lib import gemini, moderation, semantic, storage
 from lib.catalog import (
     branch_map, courses_by_ids, get_course_doc, resource_counts, to_course, to_resource, to_session,
     validate_course_fields,
@@ -17,8 +17,8 @@ from lib.db import db
 from lib.security import check_honeypot, rate_limit
 from lib.textnorm import detect_source, is_personal_contact, valid_https
 from models.schemas import (
-    Catalog, Course, CourseDetail, CourseIn, HelpfulOut, HomeStats, OkOut, Report, ReportIn, Resource,
-    ResourceType, ResourceWithCourse, SiteSettings, StudySession, StudySessionIn, TopCourse, new_id,
+    Catalog, Course, CourseDetail, CourseIn, HelpfulOut, HomeStats, OkOut, PublicSettings, Report, ReportIn,
+    Resource, ResourceType, ResourceWithCourse, SearchOut, StudySession, StudySessionIn, TopCourse, new_id,
 )
 
 router = APIRouter()
@@ -26,12 +26,12 @@ router = APIRouter()
 DEFAULT_CONTACT_URL = "https://t.me/+48Hwr9MjRHU2ODM0"
 
 
-async def get_site_settings() -> SiteSettings:
+async def get_site_settings() -> PublicSettings:
     doc = await db.settings.find_one({"_id": "site"}) or {}
-    return SiteSettings(contact_url=doc.get("contact_url") or DEFAULT_CONTACT_URL)
+    return PublicSettings(contact_url=doc.get("contact_url") or DEFAULT_CONTACT_URL, ai_search=gemini.enabled())
 
 
-@router.get("/settings", response_model=SiteSettings)
+@router.get("/settings", response_model=PublicSettings)
 async def read_settings():
     return await get_site_settings()
 
@@ -95,6 +95,29 @@ async def home_stats():
     return HomeStats(top_courses=top_courses, top_courses_fallback=fallback, top_resources=top_resources)
 
 
+# ---------- AI search ----------
+@router.get("/search", response_model=SearchOut)
+async def ai_search(request: Request, q: str = Query("", max_length=200)):
+    """Meaning-based search (e.g. "past papers for statics"). ai=false means it is unavailable right now
+    (no key, daily budget used, API error): the client then just keeps its normal keyword results."""
+    if not gemini.enabled() or len(q.strip()) < 2:
+        return SearchOut(ai=False)
+    rate_limit(request, "search", 40, 600)
+    found = await semantic.search(q)
+    if found is None:
+        return SearchOut(ai=False)
+    course_ids, resource_ids = found
+    rdocs = {d["id"]: d for d in await db.resources.find({"id": {"$in": resource_ids}}, {"_id": 0}).to_list(50)}
+    wanted_courses = list({*course_ids, *(d["course_id"] for d in rdocs.values())})
+    courses = await courses_by_ids(wanted_courses)
+    return SearchOut(
+        ai=True,
+        courses=[courses[c] for c in course_ids if c in courses],
+        resources=[ResourceWithCourse(resource=to_resource(rdocs[r]), course=courses[rdocs[r]["course_id"]])
+                   for r in resource_ids if r in rdocs and rdocs[r]["course_id"] in courses],
+    )
+
+
 # ---------- courses ----------
 @router.get("/courses/{course_id}", response_model=CourseDetail)
 async def course_detail(course_id: str):
@@ -126,6 +149,7 @@ async def create_course(body: CourseIn, request: Request):
     doc = {"id": new_id(), "branch_id": body.branch_id, "number": num,
            "name_ar": body.name_ar.strip(), "name_en": body.name_en.strip()}
     await db.courses.insert_one(dict(doc))
+    semantic.schedule_sync()
     return to_course(doc, await branch_map())
 
 
@@ -133,6 +157,7 @@ async def create_course(body: CourseIn, request: Request):
 @router.post("/resources", response_model=Resource)
 async def create_resource(
     request: Request,
+    background: BackgroundTasks,
     course_id: str = Form(...),
     title: str = Form(..., min_length=1, max_length=200),
     type: ResourceType = Form(...),
@@ -159,6 +184,8 @@ async def create_resource(
                        description=description.strip(), kind="link", url=url, source=detect_source(url),
                        link_status="unknown")
         await db.resources.insert_one(res.model_dump())
+        background.add_task(moderation.screen_resource, res.id)
+        semantic.schedule_sync()
         return res
 
     if file is None:
@@ -176,6 +203,8 @@ async def create_resource(
     res = Resource(course_id=course_id, title=title, type=type, has_solutions=has_solutions and type == "exams",
                    description=description.strip(), kind="pdf", source="pdf", file_size=len(data))
     await db.resources.insert_one({**res.model_dump(), "file_name": stored})
+    background.add_task(moderation.screen_resource, res.id)
+    semantic.schedule_sync()
     return res
 
 
@@ -213,7 +242,7 @@ async def helpful(resource_id: str, request: Request):
 
 # ---------- study sessions ----------
 @router.post("/sessions", response_model=StudySession)
-async def create_session(body: StudySessionIn, request: Request):
+async def create_session(body: StudySessionIn, request: Request, background: BackgroundTasks):
     check_honeypot(body.website)
     await get_course_doc(body.course_id)
     contact = body.contact_url.strip()
@@ -223,6 +252,7 @@ async def create_session(body: StudySessionIn, request: Request):
     s = StudySession(course_id=body.course_id, name=body.name.strip(), description=body.description.strip(),
                      specialization=body.specialization.strip(), contact_url=contact or None)
     await db.sessions.insert_one(s.model_dump())
+    background.add_task(moderation.screen_session, s.id)
     return s
 
 

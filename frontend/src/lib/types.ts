@@ -12,6 +12,7 @@ export interface OkOut {
 
 export interface SiteSettings {
   contact_url: string;
+  ai_search?: boolean; // read-only: server has an AI key, so meaning-based search is offered
 }
 
 export interface BranchIn {
@@ -153,6 +154,22 @@ export interface ResourceWithCourse {
   resource: Resource;
   course: Course;
   count: number;
+}
+
+export interface SearchOut {
+  ai: boolean;
+  courses: Course[];
+  resources: ResourceWithCourse[];
+}
+
+export interface AIStatus {
+  enabled: boolean;
+  indexed: number;
+  total: number;
+  text_model: string;
+  embed_model: string;
+  calls_used: number;
+  calls_limit: number;
 }
 
 export interface HomeStats {
