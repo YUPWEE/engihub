@@ -50,6 +50,7 @@ _BUDGET_ENV = {"search": ("GEMINI_DAILY_SEARCH", 300), "other": ("GEMINI_DAILY_O
 _used: dict[str, int] = {"search": 0, "other": 0}
 _used_day = ""
 _cooldown_until = 0.0  # set after a 429 so we stop hammering
+_last_error = ""  # last API failure (status + Google's message; never the key), shown to the admin
 
 
 def _limit(bucket: str) -> int:
@@ -77,6 +78,15 @@ def cooldown_left() -> float:
     return max(0.0, _cooldown_until - time.monotonic())
 
 
+def last_error() -> str:
+    return _last_error
+
+
+def _remember(err: str) -> None:
+    global _last_error
+    _last_error = f"{datetime.now(timezone.utc).strftime('%H:%M UTC')} {err}"[:300]
+
+
 def usage() -> dict[str, int]:
     _roll_day()
     return {"used": sum(_used.values()), "limit": sum(_limit(b) for b in _BUDGET_ENV)}
@@ -90,13 +100,19 @@ async def _post(path: str, body: dict) -> Optional[dict]:
             r = await client.post(f"{API}/{path}", json=body, headers={"x-goog-api-key": api_key()})
     except httpx.HTTPError as exc:
         logger.warning("gemini request failed: %s", type(exc).__name__)
-        return None
-    if r.status_code == 429:
-        _cooldown_until = time.monotonic() + 60
-        logger.warning("gemini rate limit hit; pausing AI calls for 60s")
+        _remember(f"network: {type(exc).__name__}")
         return None
     if r.status_code != 200:
-        logger.warning("gemini returned %s: %s", r.status_code, r.text[:300])
+        try:
+            msg = r.json().get("error", {}).get("message", "")
+        except ValueError:
+            msg = r.text
+        _remember(f"HTTP {r.status_code}: {msg[:220]}")
+        if r.status_code == 429:
+            _cooldown_until = time.monotonic() + 60
+            logger.warning("gemini rate limit hit; pausing AI calls for 60s: %s", msg[:300])
+        else:
+            logger.warning("gemini returned %s: %s", r.status_code, msg[:300])
         return None
     try:
         return r.json()

@@ -124,7 +124,7 @@ async def status() -> dict:
     wanted = await db.courses.count_documents({}) + await db.resources.count_documents({})
     return {
         "enabled": gemini.enabled(), "indexed": await db.embeddings.count_documents({}), "total": wanted,
-        "syncing": sync_running(),
+        "syncing": sync_running(), "last_error": gemini.last_error(),
         "text_model": gemini.text_model(), "embed_model": gemini.embed_model(), **{
             f"calls_{k}": v for k, v in gemini.usage().items()},
     }

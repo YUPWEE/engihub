@@ -173,6 +173,7 @@ export interface AIStatus {
   calls_used: number;
   calls_limit: number;
   syncing: boolean;
+  last_error: string;
 }
 
 export interface HomeStats {

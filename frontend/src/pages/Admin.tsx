@@ -48,6 +48,9 @@ function AiCard() {
         <p className="mt-3 text-xs text-muted-foreground" data-testid="admin-ai-status">
           {data.enabled ? t("aiOn", { i: data.indexed, n: data.total, u: data.calls_used, l: data.calls_limit }) : t("aiOff")}
           {data.syncing && <span className="ms-1 text-sage">{t("aiIndexing")}</span>}
+          {data.enabled && data.indexed < data.total && data.last_error && (
+            <span className="mt-1 block text-red-300" dir="ltr" data-testid="admin-ai-error">{data.last_error}</span>
+          )}
         </p>
       )}
       <Button type="button" variant="outline" size="sm" className="mt-4" disabled={!data?.enabled || reindex.isPending}

@@ -233,6 +233,7 @@ class AIStatus(BaseModel):
     calls_used: int
     calls_limit: int
     syncing: bool = False
+    last_error: str = ""  # last Gemini API failure, for diagnosis
 
 
 class ImportIn(BaseModel):
