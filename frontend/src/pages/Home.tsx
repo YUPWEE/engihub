@@ -35,10 +35,7 @@ export default function Home() {
             </span>
           ))}
         </h1>
-        <p className="lead-settle mt-4 max-w-2xl text-base text-muted-foreground md:text-lg" style={{ "--d": "320ms" } as React.CSSProperties} data-testid="hero-subtitle">
-          {t("heroSub")}
-        </p>
-        <div className="soft-rise mt-8 max-w-2xl" style={{ "--d": "440ms" } as React.CSSProperties}>
+        <div className="soft-rise mt-8 max-w-2xl" style={{ "--d": "380ms" } as React.CSSProperties}>
           <SearchBox
             value={q}
             onChange={setQ}
