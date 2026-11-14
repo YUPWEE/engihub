@@ -22,3 +22,9 @@ k6 run -e MODE=stress -e BASE_URL=http://127.0.0.1:5173 tests/load/site.js   # u
 822 requests, 0 errors, no rate limiting. Static page p95 71 ms. API p95 2.39 s (target 1.5 s): settings 0.47 s,
 catalog 0.95 s, course 1.6 s, home stats 2.35 s on average, the same at 1 user as at 20, so the time is a fixed
 per-request cost (sequential database round trips between Render and Atlas), not load.
+
+## After the read cache + parallel reads (same day, same test)
+
+1,312 requests, 0 errors, no rate limiting; the test passes. API p95 0.71 s (was 2.39 s). Averages: home stats 0.26 s
+(was 2.33 s), catalog 0.22 s (0.92 s), settings 0.22 s (0.45 s), course page 0.42 s (1.56 s; its p95 of 1.2 s is the
+first visit to each course, which still goes to the database). The remaining floor is the network trip to Render.
