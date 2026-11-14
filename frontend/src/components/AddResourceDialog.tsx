@@ -275,10 +275,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
             <Label htmlFor="r-desc">{t("description")}</Label>
             <Textarea id="r-desc" value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} data-testid="resource-description-input" />
           </div>
-          <p className="flex gap-2 rounded-xl border border-amber-200/15 bg-amber-200/5 p-3 text-xs leading-relaxed text-amber-100/80" data-testid="resource-rights-notice">
-            <Info className="mt-0.5 size-3.5 shrink-0" />
-            {t("rightsNotice")}
-          </p>
         </section>
 
       <input
