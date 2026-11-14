@@ -8,9 +8,10 @@ import { ReportDialog } from "@/components/ReportDialog";
 import { apiDelete, apiPatch } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { errorKey, useAdmin } from "@/lib/queries";
+import { stagger } from "@/lib/reveal";
 import type { OkOut, StudySession, StudySessionUpdate } from "@/lib/types";
 
-function SessionCard({ s, courseId }: { s: StudySession; courseId: string }) {
+function SessionCard({ s, courseId, index }: { s: StudySession; courseId: string; index: number }) {
   const { t } = useI18n();
   const admin = useAdmin();
   const qc = useQueryClient();
@@ -35,7 +36,7 @@ function SessionCard({ s, courseId }: { s: StudySession; courseId: string }) {
     await qc.invalidateQueries({ queryKey: ["course", courseId] });
   };
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/40 p-3.5" data-testid={`session-item-${s.id}`}>
+    <li className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/40 p-3.5" data-reveal="item" style={stagger(index)} data-testid={`session-item-${s.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium" data-testid="session-name">{s.name}</span>
         {s.specialization && (
@@ -126,8 +127,8 @@ export function StudySessions({ sessions, courseId, onAdd }: { sessions: StudySe
         <p className="py-4 text-center text-sm text-muted-foreground" data-testid="sessions-empty">{t("sessionsEmpty")}</p>
       ) : (
         <ul className="grid gap-2 md:grid-cols-2">
-          {sessions.map((s) => (
-            <SessionCard key={s.id} s={s} courseId={courseId} />
+          {sessions.map((s, i) => (
+            <SessionCard key={s.id} s={s} courseId={courseId} index={i} />
           ))}
         </ul>
       )}

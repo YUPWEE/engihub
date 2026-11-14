@@ -10,9 +10,10 @@ import { useI18n } from "@/lib/i18n";
 import { errorKey, formatBytes, formatDate, rememberVote, useAdmin, votedSet } from "@/lib/queries";
 import { RESOURCE_TYPES, SOURCE_META, TYPE_META } from "@/lib/resourceMeta";
 import type { HelpfulOut, OkOut, Resource, ResourceType, ResourceUpdate } from "@/lib/types";
+import { stagger } from "@/lib/reveal";
 import { cn } from "@/lib/utils";
 
-export function ResourceItem({ r, courseId }: { r: Resource; courseId: string }) {
+export function ResourceItem({ r, courseId, index = 0 }: { r: Resource; courseId: string; index?: number }) {
   const { t, lang } = useI18n();
   const admin = useAdmin();
   const qc = useQueryClient();
@@ -61,7 +62,9 @@ export function ResourceItem({ r, courseId }: { r: Resource; courseId: string })
 
   return (
     <li
-      className="group flex flex-col gap-3 rounded-xl border border-border bg-card/60 p-3.5 transition-colors duration-150 hover:border-primary/30 sm:flex-row sm:items-center"
+      className="group flex flex-col gap-3 rounded-xl border border-border bg-card/60 p-3.5 transition-[border-color,box-shadow] duration-500 ease-(--ease-quint) hover:border-primary/30 hover:shadow-[0_18px_36px_-22px_rgb(0_0_0/0.7)] sm:flex-row sm:items-center"
+      data-reveal="item"
+      style={stagger(index)}
       data-testid={`resource-item-${r.id}`}
     >
       <div className="flex min-w-0 flex-1 gap-3">

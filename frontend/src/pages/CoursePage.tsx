@@ -95,7 +95,7 @@ export default function CoursePage() {
           {lang === "ar" ? branch.name_ar : branch.name_en}
         </Link>
       </nav>
-      <section className="glass relative overflow-hidden rounded-3xl border border-border p-6 md:p-8" data-testid="course-header">
+      <section className="glass relative overflow-hidden rounded-3xl border border-border p-6 md:p-8" data-reveal="rise" data-testid="course-header">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="min-w-0">
             <div className="code-text text-5xl font-bold tracking-tight text-sage md:text-6xl" data-testid="course-code">{courseCode(course, lang)}</div>
@@ -180,15 +180,15 @@ export default function CoursePage() {
                           <span className="text-xs font-normal text-muted-foreground">{items.length}</span>
                         </summary>
                         <ul className="space-y-2 px-2 pb-2">
-                          {items.map((r) => (
-                            <ResourceItem key={r.id} r={r} courseId={id} />
+                          {items.map((r, i) => (
+                            <ResourceItem key={r.id} r={r} courseId={id} index={i} />
                           ))}
                         </ul>
                       </details>
                     ) : (
                       <ul key="" className="space-y-2">
-                        {items.map((r) => (
-                          <ResourceItem key={r.id} r={r} courseId={id} />
+                        {items.map((r, i) => (
+                          <ResourceItem key={r.id} r={r} courseId={id} index={i} />
                         ))}
                       </ul>
                     ),

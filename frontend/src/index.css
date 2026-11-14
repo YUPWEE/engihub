@@ -54,13 +54,9 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
-    --animate-rise: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
     --animate-drop: drop 0.16s ease-out both;
-}
-
-@keyframes rise {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    --ease-quint: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 @keyframes drop {
@@ -168,6 +164,98 @@
 @utility glass {
     background-color: rgb(17 26 46 / 0.72);
     backdrop-filter: blur(14px);
+}
+
+/* ---------- motion ----------
+   One easing curve everywhere (out-quint), blur-to-focus headings, wipe-in cards, staggered lists.
+   Load-time pieces use plain classes; scroll reveals use [data-reveal="kind"] and run once when lib/reveal.ts
+   marks the element [data-in] (it only adds html.motion when the visitor allows motion, so without JS or with
+   reduced motion everything is simply visible). Reveals use `animation`, never `transition`, so they don't
+   clash with hover transitions on the same element. Stagger: style={{ "--i": index }}. */
+:root { --slide: 12px; }
+html[dir="ltr"] { --slide: -12px; }
+
+@keyframes wordFocus {
+    from { opacity: 0.2; transform: translateY(0.3em); filter: blur(12px); }
+}
+@keyframes leadSettle {
+    from { opacity: 0.35; transform: translateY(10px); filter: blur(4px); }
+}
+@keyframes softRise {
+    from { opacity: 0; transform: translateY(14px); }
+}
+@keyframes revealFocus {
+    from { opacity: 0; transform: translateY(10px); filter: blur(6px); }
+}
+@keyframes revealFade {
+    from { opacity: 0; }
+}
+@keyframes revealSlide {
+    from { opacity: 0; transform: translateX(var(--slide)); }
+}
+@keyframes revealLine {
+    from { transform: scaleX(0); }
+}
+@keyframes revealCard {
+    from { clip-path: inset(0 0 100% 0 round 22px); transform: translateY(18px); }
+}
+@keyframes revealRise {
+    from { opacity: 0; transform: translateY(28px) scale(0.985); }
+}
+@keyframes revealItem {
+    from { opacity: 0; transform: translateY(16px); }
+}
+
+.word-focus { display: inline-block; animation: wordFocus 0.95s var(--ease-quint) var(--d, 0s) backwards; }
+.lead-settle { animation: leadSettle 0.9s var(--ease-quint) var(--d, 0s) backwards; }
+.soft-rise { animation: softRise 0.8s var(--ease-quint) var(--d, 0s) backwards; }
+
+.motion [data-reveal] {
+    --reveal-delay: calc(min(var(--i, 0), 8) * 70ms);
+}
+.motion [data-reveal="focus"]:not([data-in]) { opacity: 0; filter: blur(6px); transform: translateY(10px); }
+.motion [data-reveal="fade"]:not([data-in]) { opacity: 0; }
+.motion [data-reveal="slide"]:not([data-in]) { opacity: 0; transform: translateX(var(--slide)); }
+.motion [data-reveal="line"]:not([data-in]) { transform: scaleX(0); }
+.motion [data-reveal="card"]:not([data-in]) { clip-path: inset(0 0 100% 0 round 22px); transform: translateY(18px); }
+.motion [data-reveal="rise"]:not([data-in]) { opacity: 0; transform: translateY(28px) scale(0.985); }
+.motion [data-reveal="item"]:not([data-in]) { opacity: 0; transform: translateY(16px); }
+
+.motion [data-reveal="focus"][data-in] { animation: revealFocus 0.8s var(--ease-quint) var(--reveal-delay) backwards; }
+.motion [data-reveal="fade"][data-in] { animation: revealFade 0.8s var(--ease-quint) var(--reveal-delay) backwards; }
+.motion [data-reveal="slide"][data-in] { animation: revealSlide 0.7s var(--ease-quint) var(--reveal-delay) backwards; }
+.motion [data-reveal="line"][data-in] { animation: revealLine 0.7s var(--ease-quint) var(--reveal-delay) backwards; }
+.motion [data-reveal="card"][data-in] { animation: revealCard 0.9s var(--ease-quint) var(--reveal-delay) backwards; }
+.motion [data-reveal="rise"][data-in] { animation: revealRise 0.9s var(--ease-quint) var(--reveal-delay) backwards; }
+.motion [data-reveal="item"][data-in] { animation: revealItem 0.7s var(--ease-quint) var(--reveal-delay) backwards; }
+
+/* Accent line above section titles; it grows from the reading-start side. */
+.accent-line {
+    display: block;
+    height: 3px;
+    width: 1.75rem;
+    border-radius: 9999px;
+    background: linear-gradient(to right, var(--primary), var(--sage));
+    transform-origin: left;
+}
+html[dir="rtl"] .accent-line { transform-origin: right; background: linear-gradient(to left, var(--primary), var(--sage)); }
+
+/* Reduced motion: keep the gentle fades, drop movement, blur and wipes. */
+@media (prefers-reduced-motion: reduce) {
+    html:not(.force-motion) :is(.word-focus, .lead-settle, .soft-rise) {
+        animation-name: revealFade !important;
+        animation-duration: 0.6s !important;
+    }
+    html.motion:not(.force-motion) [data-reveal]:not([data-in]) {
+        opacity: 0 !important;
+        transform: none !important;
+        filter: none !important;
+        clip-path: none !important;
+    }
+    html.motion:not(.force-motion) [data-reveal][data-in] {
+        animation-name: revealFade !important;
+        animation-duration: 0.6s !important;
+    }
 }
 
 [data-sonner-toaster] [data-sonner-toast] {

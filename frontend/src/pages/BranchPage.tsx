@@ -33,7 +33,7 @@ export default function BranchPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <section className="glass mb-8 flex flex-wrap items-center gap-6 rounded-3xl border border-border p-6 md:p-8" data-testid="branch-header">
+      <section className="glass mb-8 flex flex-wrap items-center gap-6 rounded-3xl border border-border p-6 md:p-8" data-reveal="rise" data-testid="branch-header">
         <div className="grid size-20 place-items-center rounded-2xl bg-primary/10 ring-1 ring-primary/25">
           <span className="text-2xl font-bold text-sage" data-testid="branch-code">{lang === "ar" ? branch.code_ar : branch.code_en}</span>
         </div>

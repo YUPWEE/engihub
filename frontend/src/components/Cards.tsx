@@ -4,6 +4,7 @@ import { ArrowUpRight, Inbox } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { altCode, courseCode, courseName } from "@/lib/queries";
 import type { Branch, Course } from "@/lib/types";
+import { stagger } from "@/lib/reveal";
 import { cn } from "@/lib/utils";
 
 export function BranchCard({ branch, count, index }: { branch: Branch; count: number; index: number }) {
@@ -13,8 +14,9 @@ export function BranchCard({ branch, count, index }: { branch: Branch; count: nu
   return (
     <Link
       to={`/branch/${branch.id}`}
-      className="group relative flex flex-col items-center gap-1 rounded-2xl border border-border bg-card px-3 py-4 text-center animate-rise transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-card/70"
-      style={{ animationDelay: `${index * 30}ms` }}
+      className="group relative flex flex-col items-center gap-1 rounded-2xl border border-border bg-card px-3 py-4 text-center transition-[translate,scale,border-color,background-color,box-shadow] duration-500 ease-(--ease-quint) hover:-translate-y-0.5 hover:border-primary/35 hover:bg-card/70 hover:shadow-[0_22px_44px_-22px_rgb(0_0_0/0.7)] active:scale-[0.97] active:duration-75"
+      data-reveal="card"
+      style={stagger(index)}
       data-testid={`branch-card-${branch.code_en.toLowerCase()}`}
     >
       <span className="text-xl font-bold text-sage">{lang === "ar" ? branch.code_ar : branch.code_en}</span>
@@ -35,8 +37,9 @@ export function CourseCard({ course, meta, index = 0 }: { course: Course; meta?:
   return (
     <Link
       to={`/course/${course.id}`}
-      className="group flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 animate-rise transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-primary/35"
-      style={{ animationDelay: `${Math.min(index, 12) * 25}ms` }}
+      className="group flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 transition-[translate,scale,border-color,box-shadow] duration-500 ease-(--ease-quint) hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_22px_44px_-22px_rgb(0_0_0/0.7)] active:scale-[0.98] active:duration-75"
+      data-reveal="card"
+      style={stagger(index)}
       data-testid={`course-card-${course.id}`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -46,7 +49,7 @@ export function CourseCard({ course, meta, index = 0 }: { course: Course; meta?:
             {altCode(course, lang)}
           </div>
         </div>
-        <ArrowUpRight className="size-4 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 rtl:-scale-x-100" />
+        <ArrowUpRight className="size-4 text-muted-foreground transition-[translate,color] duration-500 ease-(--ease-quint) group-hover:-translate-y-0.5 group-hover:text-sage rtl:-scale-x-100" />
       </div>
       <div className="text-sm font-medium leading-snug">{courseName(course, lang)}</div>
       <div className="mt-auto flex items-center gap-2 text-xs text-muted-foreground">
@@ -61,11 +64,16 @@ export function SectionTitle({ title, sub, icon, action }: { title: string; sub?
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="flex items-center gap-2 text-xl font-semibold md:text-2xl">
+        <span className="accent-line mb-2.5" data-reveal="line" aria-hidden="true" />
+        <h2 className="flex items-center gap-2 text-xl font-semibold md:text-2xl" data-reveal="focus" style={stagger(1)}>
           {icon}
           {title}
         </h2>
-        {sub && <p className="mt-1 text-sm text-muted-foreground">{sub}</p>}
+        {sub && (
+          <p className="mt-1 text-sm text-muted-foreground" data-reveal="fade" style={stagger(2)}>
+            {sub}
+          </p>
+        )}
       </div>
       {action}
     </div>

@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { courseCode, useCatalog } from "@/lib/queries";
 import { TYPE_META } from "@/lib/resourceMeta";
 import type { HomeStats } from "@/lib/types";
+import { stagger } from "@/lib/reveal";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
@@ -26,12 +27,18 @@ export default function Home() {
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <section className="relative z-20 pt-12 pb-14 md:pt-20 md:pb-20" data-testid="hero-section">
         <h1 className="max-w-3xl text-4xl font-bold leading-[1.15] tracking-tight md:text-6xl" data-testid="hero-title">
-          {t("heroTitle")}
+          {/* Words come into focus one after another (keyed by language so a switch replays it). */}
+          {t("heroTitle").split(" ").map((w, i, all) => (
+            <span key={`${lang}-${i}`}>
+              <span className="word-focus" style={{ "--d": `${80 + i * 90}ms` } as React.CSSProperties}>{w}</span>
+              {i < all.length - 1 && " "}
+            </span>
+          ))}
         </h1>
-        <p className="mt-4 max-w-2xl text-base text-muted-foreground md:text-lg" data-testid="hero-subtitle">
+        <p className="lead-settle mt-4 max-w-2xl text-base text-muted-foreground md:text-lg" style={{ "--d": "320ms" } as React.CSSProperties} data-testid="hero-subtitle">
           {t("heroSub")}
         </p>
-        <div className="mt-8 max-w-2xl">
+        <div className="soft-rise mt-8 max-w-2xl" style={{ "--d": "440ms" } as React.CSSProperties}>
           <SearchBox
             value={q}
             onChange={setQ}
@@ -95,10 +102,10 @@ export default function Home() {
                 const meta = TYPE_META[rw.resource.type];
                 const Icon = meta.icon;
                 return (
-                  <li key={rw.resource.id}>
+                  <li key={rw.resource.id} data-reveal="item" style={stagger(i)}>
                     <Link
                       to={`/course/${rw.course.id}`}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors duration-150 hover:border-primary/35"
+                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-[translate,scale,border-color,box-shadow] duration-500 ease-(--ease-quint) hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_22px_44px_-22px_rgb(0_0_0/0.7)] active:scale-[0.98] active:duration-75"
                       data-testid={`top-resource-${i}`}
                     >
                       <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg ring-1", meta.tone)}>
