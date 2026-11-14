@@ -9,7 +9,6 @@ import {
   NotebookPen,
   Presentation,
   ScrollText,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { TKey } from "./i18n";
@@ -17,7 +16,7 @@ import type { ResourceType, Source } from "./types";
 
 export const RESOURCE_TYPES: ResourceType[] = ["slides", "notes", "textbooks", "exams", "summaries", "videos", "other"];
 
-export const TYPE_META: Record<ResourceType | "session", { icon: LucideIcon; label: TKey; tone: string }> = {
+export const TYPE_META: Record<ResourceType, { icon: LucideIcon; label: TKey; tone: string }> = {
   slides: { icon: Presentation, label: "t_slides", tone: "text-sky-300/90 bg-sky-400/10 ring-sky-300/15" },
   notes: { icon: NotebookPen, label: "t_notes", tone: "text-teal-300/90 bg-teal-400/10 ring-teal-300/15" },
   textbooks: { icon: BookOpen, label: "t_textbooks", tone: "text-indigo-300/90 bg-indigo-400/10 ring-indigo-300/15" },
@@ -25,7 +24,6 @@ export const TYPE_META: Record<ResourceType | "session", { icon: LucideIcon; lab
   summaries: { icon: ScrollText, label: "t_summaries", tone: "text-emerald-300/90 bg-emerald-400/10 ring-emerald-300/15" },
   videos: { icon: CirclePlay, label: "t_videos", tone: "text-rose-300/90 bg-rose-400/10 ring-rose-300/15" },
   other: { icon: Link2, label: "t_other", tone: "text-slate-300 bg-slate-400/10 ring-slate-300/15" },
-  session: { icon: Users, label: "t_session", tone: "text-violet-200/80 bg-violet-300/10 ring-violet-200/15" },
 };
 
 export const SOURCE_META: Record<Source, { icon: LucideIcon; label: TKey }> = {

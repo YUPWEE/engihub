@@ -16,10 +16,10 @@ import { useI18n } from "@/lib/i18n";
 import { courseCode, courseName, errorKey, formatBytes, useCatalog } from "@/lib/queries";
 import { RESOURCE_TYPES, SOURCE_META, TYPE_META, detectSource, isHttpsUrl, isPersonalContact } from "@/lib/resourceMeta";
 import { parseCode, searchCourses } from "@/lib/search";
-import type { Course, Resource, ResourceType, StudySession, StudySessionIn } from "@/lib/types";
+import type { Course, Resource, ResourceType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type AddKind = ResourceType | "session";
+export type AddKind = ResourceType;
 const MAX_PDF = 15 * 1024 * 1024;
 
 interface Props {
@@ -49,10 +49,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
-  const [sName, setSName] = useState("");
-  const [sDesc, setSDesc] = useState("");
-  const [sSpec, setSSpec] = useState("");
-  const [sContact, setSContact] = useState("");
   const [website, setWebsite] = useState("");
 
   const selected = catalog?.courses.find((c) => c.id === courseId);
@@ -60,7 +56,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
     () => (courseQuery.trim() ? searchCourses(index, courseQuery, 6, branchId) : []),
     [index, courseQuery, branchId],
   );
-  const isSession = type === "session";
 
   const m = useMutation({
     mutationFn: async () => {
@@ -69,19 +64,14 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
         const err = validateNewCourse(nc);
         if (err) throw new Error(err);
       }
-      if (isSession) {
-        if (!sName.trim() || !sDesc.trim()) throw new Error("e_title_required");
-        if (sContact.trim() && !isHttpsUrl(sContact.trim())) throw new Error("e_invalid_url");
+      if (!title.trim()) throw new Error("e_title_required");
+      if (mode === "pdf") {
+        if (!file) throw new Error("e_file_required");
+        if (file.size > MAX_PDF) throw new Error("e_too_large");
+        if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) throw new Error("e_not_pdf");
       } else {
-        if (!title.trim()) throw new Error("e_title_required");
-        if (mode === "pdf") {
-          if (!file) throw new Error("e_file_required");
-          if (file.size > MAX_PDF) throw new Error("e_too_large");
-          if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) throw new Error("e_not_pdf");
-        } else {
-          if (isPersonalContact(url)) throw new Error("e_contact_link_not_allowed");
-          if (!isHttpsUrl(url.trim())) throw new Error("e_invalid_url");
-        }
+        if (isPersonalContact(url)) throw new Error("e_contact_link_not_allowed");
+        if (!isHttpsUrl(url.trim())) throw new Error("e_invalid_url");
       }
 
       let cid = courseId;
@@ -92,29 +82,17 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
         setNewCourse(false);
       }
 
-      if (isSession) {
-        const body: StudySessionIn = {
-          course_id: cid,
-          name: sName,
-          description: sDesc,
-          specialization: sSpec,
-          contact_url: sContact.trim(),
-          website,
-        };
-        await apiPost<StudySession>("/sessions", body);
-      } else {
-        const fd = new FormData();
-        fd.append("course_id", cid);
-        fd.append("title", title);
-        fd.append("type", type);
-        fd.append("kind", mode);
-        fd.append("has_solutions", String(type === "exams" && hasSolutions));
-        fd.append("description", description);
-        fd.append("website", website);
-        if (mode === "pdf" && file) fd.append("file", file);
-        else fd.append("url", url.trim());
-        await apiUpload<Resource>("/resources", fd);
-      }
+      const fd = new FormData();
+      fd.append("course_id", cid);
+      fd.append("title", title);
+      fd.append("type", type);
+      fd.append("kind", mode);
+      fd.append("has_solutions", String(type === "exams" && hasSolutions));
+      fd.append("description", description);
+      fd.append("website", website);
+      if (mode === "pdf" && file) fd.append("file", file);
+      else fd.append("url", url.trim());
+      await apiUpload<Resource>("/resources", fd);
       return cid;
     },
     onSuccess: async (cid) => {
@@ -209,7 +187,7 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
       <section className="space-y-2">
         <Label>{t("type")}</Label>
         <div className="flex flex-wrap gap-2">
-          {[...RESOURCE_TYPES, "session" as const].map((k) => {
+          {RESOURCE_TYPES.map((k) => {
             const meta = TYPE_META[k];
             const Icon = meta.icon;
             const on = type === k;
@@ -222,7 +200,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-[background-color,border-color,color] duration-150",
                   on ? "border-primary/60 bg-primary/12 text-sage" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
-                  k === "session" && "border-dashed",
                 )}
                 data-testid={`add-resource-type-${k}`}
               >
@@ -234,38 +211,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
         </div>
       </section>
 
-      {isSession ? (
-        <section className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="s-name">{t("sessionName")}</Label>
-            <Input id="s-name" value={sName} maxLength={80} onChange={(e) => setSName(e.target.value)} data-testid="session-name-input" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="s-desc">{t("sessionDesc")}</Label>
-            <Textarea id="s-desc" value={sDesc} maxLength={500} onChange={(e) => setSDesc(e.target.value)} data-testid="session-description-input" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="s-spec">{t("sessionSpec")}</Label>
-            <Input id="s-spec" value={sSpec} maxLength={120} onChange={(e) => setSSpec(e.target.value)} data-testid="session-specialization-input" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="s-contact">{t("sessionContact")}</Label>
-            <Input
-              id="s-contact"
-              dir="ltr"
-              placeholder="https://t.me/…"
-              value={sContact}
-              onChange={(e) => setSContact(e.target.value)}
-              data-testid="session-contact-input"
-            />
-            <p className="text-xs text-muted-foreground">{t("sessionContactHint")}</p>
-            <p className="flex items-center gap-1.5 text-xs text-amber-200/80" data-testid="session-public-link-notice">
-              <Info className="size-3.5" />
-              {t("publicLinkNotice")}
-            </p>
-          </div>
-        </section>
-      ) : (
         <section className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="r-title">{t("title")}</Label>
@@ -335,7 +280,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
             {t("rightsNotice")}
           </p>
         </section>
-      )}
 
       <input
         type="text"

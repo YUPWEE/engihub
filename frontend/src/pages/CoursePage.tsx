@@ -8,7 +8,6 @@ import { AddResourceDialog, type AddKind } from "@/components/AddResourceDialog"
 import { EmptyState } from "@/components/Cards";
 import { EditDialog, type FieldValues } from "@/components/EditDialog";
 import { ResourceItem } from "@/components/ResourceItem";
-import { StudySessions } from "@/components/StudySessions";
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { altCode, altName, courseCode, courseName, errorKey, useAdmin, useCatalog } from "@/lib/queries";
@@ -78,7 +77,7 @@ export default function CoursePage() {
       </div>
     );
 
-  const { course, branch, resources, sessions } = data;
+  const { course, branch, resources } = data;
   const groups = RESOURCE_TYPES.map((type) => ({ type, items: resources.filter((r) => r.type === type) })).filter((g) => g.items.length);
   const saveCourse = async (v: FieldValues) => {
     const body: CourseUpdate = { branch_id: String(v.branch_id), number: String(v.number), name_ar: String(v.name_ar), name_en: String(v.name_en) };
@@ -200,7 +199,6 @@ export default function CoursePage() {
         )}
       </div>
 
-      <StudySessions sessions={sessions} courseId={id} onAdd={() => setAdd({ open: true, type: "session" })} />
 
       <AddResourceDialog
         key={add.type ?? "res"}
