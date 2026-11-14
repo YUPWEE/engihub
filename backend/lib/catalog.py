@@ -1,10 +1,12 @@
 """Shared read helpers: turn raw Mongo docs into response models."""
 
+import asyncio
 from datetime import timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException
 
+from lib import cache
 from lib.db import db
 from lib.textnorm import NUMBER_RE, norm, norm_number
 from models.schemas import Branch, Course, Resource, StudySession
@@ -30,8 +32,11 @@ def to_session(doc: dict) -> StudySession:
 
 
 async def branch_map() -> dict[str, Branch]:
-    docs = await db.branches.find({}, {"_id": 0}).sort("order", 1).to_list(1000)
-    return {d["id"]: Branch(**d) for d in docs}
+    """Branches rarely change; cached (and dropped by any write, see lib/cache). Treat the result as read-only."""
+    async def load() -> dict[str, Branch]:
+        docs = await db.branches.find({}, {"_id": 0}).sort("order", 1).to_list(1000)
+        return {d["id"]: Branch(**d) for d in docs}
+    return await cache.get_or_set("branches", 300, load)
 
 
 def to_course(doc: dict, branches: dict[str, Branch], count: int = 0) -> Course:
@@ -60,9 +65,11 @@ async def get_course_doc(course_id: str) -> dict:
 
 
 async def courses_by_ids(ids: list[str]) -> dict[str, Course]:
-    branches = await branch_map()
-    docs = await db.courses.find({"id": {"$in": ids}}, {"_id": 0}).to_list(len(ids) + 1)
-    counts = await resource_counts([d["id"] for d in docs])
+    if not ids:
+        return {}
+    branches, docs, counts = await asyncio.gather(
+        branch_map(), db.courses.find({"id": {"$in": ids}}, {"_id": 0}).to_list(len(ids) + 1), resource_counts(ids)
+    )
     return {d["id"]: to_course(d, branches, counts.get(d["id"], 0)) for d in docs}
 
 

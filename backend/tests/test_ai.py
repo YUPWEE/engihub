@@ -16,7 +16,7 @@ import httpx  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 
-from lib import gemini, security, semantic  # noqa: E402
+from lib import cache, gemini, security, semantic  # noqa: E402
 from lib.db import db  # noqa: E402
 from server import app  # noqa: E402
 
@@ -47,6 +47,7 @@ async def api(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     monkeypatch.setattr(gemini, "_post", fake_post)
     security._buckets.clear()  # rate-limit counters are per process; start each test fresh
+    cache.clear()
     semantic._pending, semantic._dirty = None, False  # a task left on a previous test's (closed) event loop
     calls.clear()
     for k in gemini._used:

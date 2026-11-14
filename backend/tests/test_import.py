@@ -11,6 +11,7 @@ for k, v in dict(MONGO_URL="mongomock://local", DB_NAME="engihub_test", ADMIN_PA
 import httpx  # noqa: E402
 import pytest_asyncio  # noqa: E402
 
+from lib import cache  # noqa: E402
 from lib.db import db  # noqa: E402
 from server import app  # noqa: E402
 
@@ -20,6 +21,7 @@ HEADER = "code,name_ar,name_en,type,title,url,has_solutions,section,description\
 @pytest_asyncio.fixture
 async def admin(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    cache.clear()
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test/api") as c:
             await db.resources.delete_many({})

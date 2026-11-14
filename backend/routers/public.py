@@ -7,7 +7,9 @@ from urllib.parse import quote
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 
-from lib import gemini, moderation, semantic, storage
+import asyncio
+
+from lib import cache, gemini, moderation, semantic, storage
 from lib.catalog import (
     branch_map, courses_by_ids, get_course_doc, resource_counts, to_course, to_resource, to_session,
     validate_course_fields,
@@ -33,7 +35,7 @@ async def get_site_settings() -> PublicSettings:
 
 @router.get("/settings", response_model=PublicSettings)
 async def read_settings():
-    return await get_site_settings()
+    return await cache.get_or_set("settings", 300, get_site_settings)
 
 ADD_LIMIT, ADD_WINDOW = 12, 600
 
@@ -62,9 +64,13 @@ async def top_events(kind: str, limit: int) -> list[tuple[str, int]]:
 # ---------- catalog ----------
 @router.get("/catalog", response_model=Catalog)
 async def catalog():
-    branches = await branch_map()
-    docs = await db.courses.find({}, {"_id": 0}).to_list(20000)
-    counts = await resource_counts()
+    return await cache.get_or_set("catalog", 60, _catalog)
+
+
+async def _catalog() -> Catalog:
+    branches, docs, counts = await asyncio.gather(
+        branch_map(), db.courses.find({}, {"_id": 0}).to_list(20000), resource_counts()
+    )
     order = {bid: b.order for bid, b in branches.items()}
     docs.sort(key=lambda d: (order.get(d["branch_id"], 999), d["number"]))
     return Catalog(
@@ -75,8 +81,15 @@ async def catalog():
 
 @router.get("/home", response_model=HomeStats)
 async def home_stats():
-    top = await top_events("open", 8)
-    courses = await courses_by_ids([cid for cid, _ in top])
+    return await cache.get_or_set("home", 60, _home_stats)
+
+
+async def _home_stats() -> HomeStats:
+    top, top_res = await asyncio.gather(top_events("open", 8), top_events("download", 8))
+    courses, rdocs = await asyncio.gather(
+        courses_by_ids([cid for cid, _ in top]),
+        db.resources.find({"id": {"$in": [rid for rid, _ in top_res]}}, {"_id": 0}).to_list(50),
+    )
     top_courses = [TopCourse(course=courses[cid], count=n) for cid, n in top if cid in courses][:8]
     fallback = not top_courses
     if fallback:
@@ -84,8 +97,6 @@ async def home_stats():
         ranked = sorted(catalog_.courses, key=lambda c: -c.resource_count)[:6]
         top_courses = [TopCourse(course=c, count=0) for c in ranked]
 
-    top_res = await top_events("download", 8)
-    rdocs = await db.resources.find({"id": {"$in": [rid for rid, _ in top_res]}}, {"_id": 0}).to_list(50)
     rmap = {d["id"]: to_resource(d) for d in rdocs}
     rcourses = await courses_by_ids(list({r.course_id for r in rmap.values()}))
     top_resources = [
@@ -121,11 +132,18 @@ async def ai_search(request: Request, q: str = Query("", max_length=200)):
 # ---------- courses ----------
 @router.get("/courses/{course_id}", response_model=CourseDetail)
 async def course_detail(course_id: str):
-    doc = await get_course_doc(course_id)
-    branches = await branch_map()
-    resources = [to_resource(d) for d in await db.resources.find({"course_id": course_id}, {"_id": 0}).to_list(5000)]
-    sessions = [to_session(d) for d in await db.sessions.find({"course_id": course_id}, {"_id": 0})
-                .sort("created_at", -1).to_list(1000)]
+    return await cache.get_or_set(f"course:{course_id}", 30, lambda: _course_detail(course_id))
+
+
+async def _course_detail(course_id: str) -> CourseDetail:
+    doc, branches, rdocs, sdocs = await asyncio.gather(
+        get_course_doc(course_id),
+        branch_map(),
+        db.resources.find({"course_id": course_id}, {"_id": 0}).to_list(5000),
+        db.sessions.find({"course_id": course_id}, {"_id": 0}).sort("created_at", -1).to_list(1000),
+    )
+    resources = [to_resource(d) for d in rdocs]
+    sessions = [to_session(d) for d in sdocs]
     branch = branches.get(doc["branch_id"])
     if not branch:
         raise HTTPException(status_code=404, detail="branch_not_found")
