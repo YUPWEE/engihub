@@ -130,19 +130,8 @@ function Footer({ onKey, onQr }: { onKey: () => void; onQr: () => void }) {
   const { t } = useI18n();
   return (
     <footer className="mt-20 border-t border-border/70 bg-panel/60">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1.5">
-          <div className="flex items-baseline gap-2">
-            <Wordmark className="text-xl" />
-            <span className="text-xs text-muted-foreground">{t("footerPlatform")}</span>
-          </div>
-          <p className="text-sm text-foreground/85" data-testid="footer-designed">
-            {t("footerDesigned")}
-          </p>
-          <p className="text-xs text-muted-foreground" data-testid="footer-privacy">
-            {t("footerPrivacy")}
-          </p>
-        </div>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-6">
+        <Wordmark className="text-xl" />
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="rounded-full" onClick={onQr} data-testid="footer-qr-button">
             <QrCode className="size-4" />
