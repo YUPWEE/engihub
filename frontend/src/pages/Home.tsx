@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, GraduationCap, Layers, TrendingUp } from "lucide-react";
+import { Download, Layers, TrendingUp } from "lucide-react";
 import { BranchCard, CourseCard, EmptyState, SectionTitle, SkeletonGrid } from "@/components/Cards";
 import { SearchBox } from "@/components/SearchBox";
 import { apiGet } from "@/lib/api";
@@ -25,11 +25,7 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <section className="relative z-20 pt-12 pb-14 md:pt-20 md:pb-20" data-testid="hero-section">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-xs text-sage" data-testid="hero-badge">
-          <GraduationCap className="size-3.5" />
-          {t("heroBadge")}
-        </span>
-        <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-[1.15] tracking-tight md:text-6xl" data-testid="hero-title">
+        <h1 className="max-w-3xl text-4xl font-bold leading-[1.15] tracking-tight md:text-6xl" data-testid="hero-title">
           {t("heroTitle")}
         </h1>
         <p className="mt-4 max-w-2xl text-base text-muted-foreground md:text-lg" data-testid="hero-subtitle">

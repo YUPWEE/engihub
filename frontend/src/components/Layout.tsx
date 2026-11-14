@@ -1,16 +1,15 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Languages, LayoutDashboard, LogOut, QrCode, Send, ShieldCheck } from "lucide-react";
+import { KeyRound, Languages, LayoutDashboard, LogOut, QrCode, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { AddResourceDialog } from "@/components/AddResourceDialog";
 import { AdminLoginDialog } from "@/components/AdminLoginDialog";
 import { QrDialog } from "@/components/QrDialog";
 import { apiPost } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { useAdmin, useSettings } from "@/lib/queries";
+import { useAdmin } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 export function Wordmark({ className }: { className?: string }) {
@@ -40,45 +39,7 @@ function NavItems({ className, variant }: { className?: string; variant: "deskto
   );
 }
 
-function ContactButton() {
-  const { t } = useI18n();
-  const { data } = useSettings();
-  if (!data?.contact_url) return null;
-  return (
-    <a
-      href={data.contact_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={t("contactHint")}
-      aria-label={`${t("contactUs")} — ${t("contactHint")}`}
-      className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/35 px-2.5 text-sm text-sage transition-[background-color,border-color] duration-150 hover:border-primary/60 hover:bg-primary/10 md:px-3"
-      data-testid="header-contact-button"
-    >
-      <Send className="size-4 rtl:-scale-x-100" />
-      <span className="hidden md:inline">{t("contactUs")}</span>
-    </a>
-  );
-}
-
-function Tagline({ onShare }: { onShare: () => void }) {
-  const { t } = useI18n();
-  return (
-    <p className="mx-auto max-w-6xl px-4 pb-2 text-center text-xs leading-relaxed text-balance text-muted-foreground" data-testid="header-tagline">
-      {t("taglineBefore")}
-      <button
-        type="button"
-        onClick={onShare}
-        className="text-sage/90 underline decoration-primary/40 underline-offset-4 transition-colors duration-150 hover:text-sage hover:decoration-primary"
-        data-testid="header-tagline-share-link"
-      >
-        {t("taglineLink")}
-      </button>
-      {t("taglineAfter")}
-    </p>
-  );
-}
-
-function Header({ onShare }: { onShare: () => void }) {
+function Header() {
   const { t, lang, setLang } = useI18n();
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
@@ -87,7 +48,9 @@ function Header({ onShare }: { onShare: () => void }) {
           <img
             src="/ksu-logo.png"
             alt={t("ksu")}
-            className="h-10 w-auto rounded-md md:h-11"
+            width={92}
+            height={144}
+            className="h-10 w-auto md:h-11"
             data-testid="header-ksu-logo"
           />
           <span className="hidden leading-tight sm:block">
@@ -112,10 +75,8 @@ function Header({ onShare }: { onShare: () => void }) {
             <Languages className="size-4" />
             {t("langToggle")}
           </Button>
-          <ContactButton />
         </div>
       </div>
-      <Tagline onShare={onShare} />
       <div className="flex justify-center pb-2 md:hidden">
         <NavItems className="flex" variant="mobile" />
       </div>
@@ -208,10 +169,9 @@ export default function Layout() {
   const isAdmin = useAdmin();
   const [loginOpen, setLoginOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   return (
     <div className="flex min-h-svh flex-col">
-      <Header onShare={() => setShareOpen(true)} />
+      <Header />
       {isAdmin && <AdminBanner />}
       <main className="flex-1">
         <Outlet />
@@ -219,7 +179,6 @@ export default function Layout() {
       <Footer onKey={() => setLoginOpen(true)} onQr={() => setQrOpen(true)} />
       <AdminLoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
       <QrDialog open={qrOpen} onOpenChange={setQrOpen} />
-      <AddResourceDialog open={shareOpen} onOpenChange={setShareOpen} />
       <Toaster richColors position="bottom-right" />
     </div>
   );
