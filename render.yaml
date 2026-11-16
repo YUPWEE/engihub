@@ -18,7 +18,7 @@ services:
       - key: DB_NAME
         value: engihub
       - key: CORS_ORIGINS       # the Vercel site (browsers reach the API same-origin through Vercel's /api rewrite)
-        value: https://engihub-sooty.vercel.app
+        value: https://engihub.xyz,https://engihub-sooty.vercel.app
       - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_TOKEN_SECRET

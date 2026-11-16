@@ -12,7 +12,7 @@ import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Rate } from "k6/metrics";
 
-const BASE = (__ENV.BASE_URL || "https://engihub-sooty.vercel.app").replace(/\/$/, "");
+const BASE = (__ENV.BASE_URL || "https://engihub.xyz").replace(/\/$/, "");
 const MODE = __ENV.MODE || "live";
 const IS_LIVE_SITE = !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(BASE);
 
