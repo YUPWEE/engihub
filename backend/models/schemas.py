@@ -89,6 +89,8 @@ class Resource(BaseModel):
     has_solutions: bool = False
     description: str = ""
     section: str = ""  # optional sub-heading inside the type group (e.g. "Finals"); set by bulk import
+    title_en: str = ""  # English title when the original is Arabic (see lib/translations.py); "" = show title
+    section_en: str = ""
     kind: Literal["pdf", "link"]
     url: Optional[str] = None
     source: Source
@@ -107,6 +109,7 @@ class ResourceUpdate(BaseModel):
     description: str = Field(default="", max_length=500)
     url: Optional[str] = None
     section: Optional[str] = Field(default=None, max_length=120)  # None = leave unchanged
+    title_en: Optional[str] = Field(default=None, max_length=200)  # None = leave unchanged
 
 
 class HelpfulOut(BaseModel):

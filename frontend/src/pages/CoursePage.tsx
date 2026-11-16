@@ -9,8 +9,8 @@ import { EmptyState } from "@/components/Cards";
 import { EditDialog, type FieldValues } from "@/components/EditDialog";
 import { ResourceItem } from "@/components/ResourceItem";
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
-import { altCode, altName, courseCode, courseName, errorKey, useAdmin, useCatalog } from "@/lib/queries";
+import { useI18n, type Lang } from "@/lib/i18n";
+import { altCode, altName, courseCode, courseName, errorKey, resourceSection, resourceTitle, useAdmin, useCatalog } from "@/lib/queries";
 import { RESOURCE_TYPES, TYPE_META } from "@/lib/resourceMeta";
 import type { Course, CourseDetail, CourseUpdate, OkOut, Resource, ResourceType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -19,14 +19,15 @@ const collator = new Intl.Collator(["ar", "en"], { numeric: true, sensitivity: "
 
 // Split one type group into sub-sections (e.g. Drive folders such as "النهائية"). Items without a section keep
 // their order and come first; sectioned items are sorted naturally (exams newest first, everything else 1→n).
-function sectionsOf(items: Resource[], type: ResourceType): [string, Resource[]][] {
+function sectionsOf(items: Resource[], type: ResourceType, lang: Lang): [string, Resource[]][] {
   const map = new Map<string, Resource[]>();
   for (const r of items) {
-    const k = r.section ?? "";
+    const k = resourceSection(r, lang);
     map.set(k, [...(map.get(k) ?? []), r]);
   }
   const dir = type === "exams" ? -1 : 1;
-  for (const [k, list] of map) if (k) list.sort((a, b) => dir * collator.compare(a.title, b.title));
+  const title = (r: Resource) => resourceTitle(r, lang);
+  for (const [k, list] of map) if (k) list.sort((a, b) => dir * collator.compare(title(a), title(b)));
   return [...map.entries()].sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : collator.compare(a, b)));
 }
 
@@ -170,7 +171,7 @@ export default function CoursePage() {
                   <span className="text-sm font-normal text-muted-foreground">({g.items.length})</span>
                 </h2>
                 <div className="space-y-2">
-                  {sectionsOf(g.items, g.type).map(([name, items]) =>
+                  {sectionsOf(g.items, g.type, lang).map(([name, items]) =>
                     name ? (
                       <details key={name} open={g.items.length <= 12} className="group rounded-xl border border-border/70" data-testid="resource-section">
                         <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">

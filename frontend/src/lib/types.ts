@@ -66,6 +66,8 @@ export interface Resource {
   has_solutions: boolean;
   description: string;
   section?: string; // optional sub-heading inside the type group (set by bulk import)
+  title_en?: string; // English title when the original is Arabic ("" = use title)
+  section_en?: string;
   kind: "pdf" | "link";
   url: string | null;
   source: Source;
@@ -84,6 +86,7 @@ export interface ResourceUpdate {
   description: string;
   url: string | null;
   section?: string | null; // omitted/null = unchanged
+  title_en?: string | null;
 }
 
 export interface HelpfulOut {

@@ -7,7 +7,7 @@ import { EditDialog, type FieldValues } from "@/components/EditDialog";
 import { ReportDialog } from "@/components/ReportDialog";
 import { apiDelete, apiPatch, apiPost } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { errorKey, formatBytes, formatDate, rememberVote, useAdmin, votedSet } from "@/lib/queries";
+import { errorKey, formatBytes, formatDate, rememberVote, resourceTitle, useAdmin, votedSet } from "@/lib/queries";
 import { RESOURCE_TYPES, SOURCE_META, TYPE_META } from "@/lib/resourceMeta";
 import type { HelpfulOut, OkOut, Resource, ResourceType, ResourceUpdate } from "@/lib/types";
 import { stagger } from "@/lib/reveal";
@@ -51,6 +51,7 @@ export function ResourceItem({ r, courseId, index = 0 }: { r: Resource; courseId
   const save = async (v: FieldValues) => {
     const body: ResourceUpdate = {
       title: String(v.title),
+      title_en: String(v.title_en ?? ""),
       type: v.type as ResourceType,
       has_solutions: !!v.has_solutions,
       description: String(v.description),
@@ -79,7 +80,7 @@ export function ResourceItem({ r, courseId, index = 0 }: { r: Resource; courseId
             className="font-medium leading-snug transition-colors duration-150 hover:text-sage"
             data-testid="resource-title-link"
           >
-            {r.title}
+            {resourceTitle(r, lang)}
           </a>
           {r.description && <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{r.description}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.7rem]">
@@ -160,9 +161,10 @@ export function ResourceItem({ r, courseId, index = 0 }: { r: Resource; courseId
           onOpenChange={setEditOpen}
           title={t("editResource")}
           testid="edit-resource"
-          initial={{ title: r.title, type: r.type, has_solutions: r.has_solutions, description: r.description, url: r.url ?? "" }}
+          initial={{ title: r.title, title_en: r.title_en ?? "", type: r.type, has_solutions: r.has_solutions, description: r.description, url: r.url ?? "" }}
           fields={[
             { name: "title", label: t("title") },
+            { name: "title_en", label: t("titleEn"), ltr: true },
             { name: "type", label: t("type"), kind: "select", options: RESOURCE_TYPES.map((k) => ({ value: k, label: t(TYPE_META[k].label) })) },
             { name: "has_solutions", label: t("includesSolutions"), kind: "checkbox" },
             ...(r.kind === "link" ? [{ name: "url", label: t("url"), ltr: true }] : []),

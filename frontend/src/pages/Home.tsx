@@ -6,7 +6,7 @@ import { BranchCard, CourseCard, EmptyState, SectionTitle, SkeletonGrid } from "
 import { SearchBox } from "@/components/SearchBox";
 import { apiGet } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { courseCode, useCatalog } from "@/lib/queries";
+import { courseCode, resourceTitle, useCatalog } from "@/lib/queries";
 import { TYPE_META } from "@/lib/resourceMeta";
 import type { HomeStats } from "@/lib/types";
 import { stagger } from "@/lib/reveal";
@@ -109,7 +109,7 @@ export default function Home() {
                         <Icon className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{rw.resource.title}</span>
+                        <span className="block truncate text-sm font-medium">{resourceTitle(rw.resource, lang)}</span>
                         <span className="code-text text-xs text-sage">{courseCode(rw.course, lang)}</span>
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground">{t("downloads", { n: rw.count })}</span>

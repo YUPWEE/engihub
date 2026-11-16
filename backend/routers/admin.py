@@ -7,7 +7,7 @@ from typing import get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from lib import semantic, storage
+from lib import semantic, storage, translations
 from lib.catalog import (
     aware, branch_map, courses_by_ids, get_course_doc, match_branch, to_course, to_resource, to_session,
     validate_course_fields,
@@ -157,6 +157,8 @@ async def update_resource(resource_id: str, body: ResourceUpdate):
            "has_solutions": body.has_solutions and body.type == "exams"}
     if body.section is not None:
         upd["section"] = body.section.strip()
+    if body.title_en is not None:
+        upd["title_en"] = body.title_en.strip()
     if doc["kind"] == "link" and body.url is not None and body.url.strip() != doc.get("url"):
         url = body.url.strip()
         if is_personal_contact(url):
@@ -351,7 +353,7 @@ async def import_resources(body: ImportIn):
         rtype = rtype.lower() if rtype.lower() in types else "other"
         res = Resource(course_id=course["id"], title=title, type=rtype, kind="link", url=url,
                        source=detect_source(url), link_status="unknown", description=description[:500],
-                       section=section[:120],
+                       section=section[:120], **translations.english_for(title, section[:120]),
                        has_solutions=rtype == "exams" and solved.lower() in ("1", "true", "yes", "y"))
         new_docs.append(res.model_dump())
     if new_docs:

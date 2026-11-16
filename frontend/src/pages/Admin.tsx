@@ -11,7 +11,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n, type TKey } from "@/lib/i18n";
-import { courseCode, errorKey, formatBytes, formatDate, useAdminStatus, useCatalog, useSettings } from "@/lib/queries";
+import { courseCode, errorKey, formatBytes, formatDate, resourceTitle, useAdminStatus, useCatalog, useSettings } from "@/lib/queries";
 import type { AdminOverview, AIStatus, Branch, BranchIn, ImportIn, ImportResourcesResult, ImportResult, OkOut, SiteSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -250,7 +250,7 @@ export default function Admin() {
                 <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3" data-testid={`admin-broken-${r.id}`}>
                   <Link2Off className="size-4 text-red-300" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{r.title}</span>
+                    <span className="block truncate text-sm font-medium">{resourceTitle(r, lang)}</span>
                     <span className="block truncate text-xs text-muted-foreground" dir="ltr">{courseCode(course, lang)} · {r.url}</span>
                   </span>
                   <Link to={`/course/${course.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })} data-testid="admin-broken-goto">

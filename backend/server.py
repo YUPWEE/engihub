@@ -13,7 +13,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 from lib.db import client, ensure_indexes  # noqa: E402
-from lib import cache, semantic  # noqa: E402
+from lib import cache, semantic, translations  # noqa: E402
 from lib.linkcheck import link_check_loop  # noqa: E402
 from lib.seed import seed_if_empty  # noqa: E402
 from routers import admin as admin_routes  # noqa: E402
@@ -27,6 +27,10 @@ logging.getLogger("uvicorn.access").disabled = True
 async def lifespan(app: FastAPI):
     await ensure_indexes()
     await seed_if_empty()
+    try:
+        await translations.apply()  # fill English titles/sections/names from data/translations_en.json
+    except Exception as exc:  # never block startup on this
+        logging.getLogger(__name__).error("applying translations failed: %s", exc)
     app.state.link_task = asyncio.create_task(link_check_loop())
     semantic.schedule_sync(delay=20)  # index anything new since the last start (no-op without an AI key)
     yield

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiGet } from "./api";
 import { isTKey, type Lang, type TKey } from "./i18n";
-import type { AdminMe, Catalog, Course, SearchOut, SiteSettings } from "./types";
+import type { AdminMe, Catalog, Course, Resource, SearchOut, SiteSettings } from "./types";
 
 const CATALOG_KEY = "engihub_catalog_v1";
 let cacheMemo: { t: number; data: Catalog } | null | undefined;
@@ -96,6 +96,10 @@ export function errorKey(err: unknown): TKey {
   if (err instanceof Error && isTKey(err.message)) return err.message;
   return "e_generic";
 }
+
+// Resource text in the reader's language: English versions exist for content imported in Arabic.
+export const resourceTitle = (r: Resource, lang: Lang) => (lang === "en" && r.title_en) || r.title;
+export const resourceSection = (r: Resource, lang: Lang) => (lang === "en" && r.section_en) || r.section || "";
 
 export const courseCode = (c: Course, lang: Lang) => (lang === "ar" ? c.code_ar : c.code_en);
 export const altCode = (c: Course, lang: Lang) => (lang === "ar" ? c.code_en : c.code_ar);

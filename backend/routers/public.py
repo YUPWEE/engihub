@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse, Response
 
 import asyncio
 
-from lib import cache, gemini, moderation, semantic, storage
+from lib import cache, gemini, moderation, semantic, storage, translations
 from lib.catalog import (
     branch_map, courses_by_ids, get_course_doc, resource_counts, to_course, to_resource, to_session,
     validate_course_fields,
@@ -200,7 +200,7 @@ async def create_resource(
         rate_limit(request, "add", ADD_LIMIT, ADD_WINDOW)
         res = Resource(course_id=course_id, title=title, type=type, has_solutions=has_solutions and type == "exams",
                        description=description.strip(), kind="link", url=url, source=detect_source(url),
-                       link_status="unknown")
+                       link_status="unknown", **translations.english_for(title))
         await db.resources.insert_one(res.model_dump())
         background.add_task(moderation.screen_resource, res.id)
         semantic.schedule_sync()
@@ -219,7 +219,8 @@ async def create_resource(
     rate_limit(request, "upload", 6, ADD_WINDOW)
     stored = await storage.save_pdf(data)
     res = Resource(course_id=course_id, title=title, type=type, has_solutions=has_solutions and type == "exams",
-                   description=description.strip(), kind="pdf", source="pdf", file_size=len(data))
+                   description=description.strip(), kind="pdf", source="pdf", file_size=len(data),
+                   **translations.english_for(title))
     await db.resources.insert_one({**res.model_dump(), "file_name": stored})
     background.add_task(moderation.screen_resource, res.id)
     semantic.schedule_sync()
