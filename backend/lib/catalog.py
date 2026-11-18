@@ -1,5 +1,3 @@
-"""Shared read helpers: turn raw Mongo docs into response models."""
-
 import asyncio
 from datetime import timezone
 from typing import Any, Optional
@@ -20,7 +18,7 @@ def _aware(doc: dict) -> dict:
     return doc
 
 
-aware = _aware  # public alias: mark Mongo's naive UTC `created_at` as UTC before it reaches a response model
+aware = _aware
 
 
 def to_resource(doc: dict) -> Resource:
@@ -32,7 +30,6 @@ def to_session(doc: dict) -> StudySession:
 
 
 async def branch_map() -> dict[str, Branch]:
-    """Branches rarely change; cached (and dropped by any write, see lib/cache). Treat the result as read-only."""
     async def load() -> dict[str, Branch]:
         docs = await db.branches.find({}, {"_id": 0}).sort("order", 1).to_list(1000)
         return {d["id"]: Branch(**d) for d in docs}
@@ -75,7 +72,6 @@ async def courses_by_ids(ids: list[str]) -> dict[str, Course]:
 
 async def validate_course_fields(branch_id: str, number: str, name_ar: str, name_en: str,
                                  exclude_id: Optional[str] = None) -> str:
-    """Returns the normalised number; raises 4xx on bad branch/format/duplicate."""
     if not await db.branches.find_one({"id": branch_id}):
         raise HTTPException(status_code=400, detail="branch_not_found")
     num = norm_number(number)

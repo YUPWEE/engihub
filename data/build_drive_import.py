@@ -1,19 +1,3 @@
-"""Builds data/drive-import.csv from the shared KSU engineering Drive, file by file.
-
-    python -I data/build_drive_import.py            # crawl the Drive anonymously (no login, public items only)
-    python -I data/build_drive_import.py --cached   # reuse data/.drive-tree.json from the last crawl
-
-How the Drive maps onto the site:
-- Course folders live under the "مقررات ..." level folders; the course code is the folder name before "|".
-- Each document (PDF, slides, Word, video...) becomes one link. A folder that is mostly photos (WhatsApp exam
-  pictures, drawing-solution screenshots) becomes ONE link to the folder instead of dozens of images.
-- type comes from the folder path and file name; `section` is the sub-folder inside the course (e.g. "النهائية"),
-  shown as a collapsible sub-heading on the course page; has_solutions is set for exams named as solved.
-- Every course also gets one link to its whole Drive folder.
-- Skipped on purpose: grade-result sheets (privacy), the non-course "أدلة الكلية" folder and the initiative's own
-  files. Output columns match the admin importer: code,name_ar,name_en,type,title,url,has_solutions,section,description
-"""
-
 import csv
 import html
 import json
@@ -29,12 +13,11 @@ ROOT = "1-1mGVrrYzo-RslxHhfHSZFPj-lZWsvxk"
 HERE = Path(__file__).parent
 CACHE = HERE / ".drive-tree.json"
 OUT = HERE / "drive-import.csv"
-SKIP_NAMES = ("نتائج الدرجات", "سبر", "تم الإعداد من", "تم الاعداد من")  # grades, empty folders, credits
-SKIP_RE = r"^نتائج .*طلاب"  # student result sheets
+SKIP_NAMES = ("نتائج الدرجات", "سبر", "تم الإعداد من", "تم الاعداد من")
+SKIP_RE = r"^نتائج .*طلاب"
 MIN_IMAGES_TO_COLLAPSE, MAX_DOCS_SHARE = 3, 0.15
 
 
-# ---------- crawl ----------
 def parse_listing(text: str) -> list[dict]:
     out = []
     for chunk in text.split('<div class="flip-entry" id="entry-')[1:]:
@@ -80,9 +63,8 @@ def crawl() -> dict:
     return nodes
 
 
-# ---------- classify ----------
 def clean(seg: str) -> str:
-    seg = re.sub(r"^\s*\d+(\.\d+)?\s*(》|\||_)\s*", "", seg)  # "2》", "1 | ", "3 _ ", "2.1 | "
+    seg = re.sub(r"^\s*\d+(\.\d+)?\s*(》|\||_)\s*", "", seg)
     return seg.strip(" _-")
 
 
@@ -148,12 +130,10 @@ def build(nodes: dict) -> list[dict]:
         return out
 
     def image_heavy(fid: str) -> bool:
-        """Mostly photos: collapse into one folder link, but only when that hides very few documents."""
         files = files_under(fid)
         imgs = sum(1 for f in files if f["mime"].startswith("image/"))
         if imgs >= MIN_IMAGES_TO_COLLAPSE and (len(files) - imgs) <= max(3, MAX_DOCS_SHARE * len(files)):
             return True
-        # Big photo galleries (e.g. drawing-solution screenshots) whose few documents sit in sub-folders.
         direct_docs = sum(1 for c in nodes[fid]["children"]
                           if c in nodes and not nodes[c]["folder"] and not nodes[c]["mime"].startswith("image/"))
         return imgs >= 10 and imgs / len(files) >= 0.75 and direct_docs <= 3
@@ -161,10 +141,9 @@ def build(nodes: dict) -> list[dict]:
     rows: list[dict] = []
 
     def add(code: str, segs: list[str], name: str, url: str, mime: str, kind_hint: str = "") -> None:
-        inner = segs[1:]  # path below the course folder
+        inner = segs[1:]
         cleaned = [clean(s) for s in inner]
         rtype = classify(cleaned, name, mime) if not kind_hint else kind_hint
-        # Section: path below the course folder, minus the generic category folder ("الاختبارات", "المصادر"...).
         generic = r"^(الاختبارات|اختبارات|المصادر|الشرائح|الكتب|التمارين|شروح)$"
         sec_parts = cleaned[1:] if cleaned and re.match(generic, cleaned[0]) else cleaned
         section = " / ".join(p for p in sec_parts if p)[:120]
@@ -173,13 +152,13 @@ def build(nodes: dict) -> list[dict]:
 
     def walk(fid: str, code: str) -> None:
         node = nodes[fid]
-        segs = node["path"][1:] + [node["name"]]  # from the course folder down
+        segs = node["path"][1:] + [node["name"]]
         for c in node["children"]:
             n = nodes.get(c)
             if not n or c == fid or any(s in n["name"] for s in SKIP_NAMES) or re.match(SKIP_RE, n["name"]):
                 continue
             if n["folder"]:
-                if len(segs) >= 2 and image_heavy(c):  # never collapse a whole category folder
+                if len(segs) >= 2 and image_heavy(c):
                     count = len(files_under(c))
                     add(code, segs + [n["name"]], f"{clean(n['name'])} (مجلد صور، {count} ملف)",
                         f"https://drive.google.com/drive/folders/{c}", "image/folder")

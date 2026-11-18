@@ -1,8 +1,3 @@
-"""Thin client for the Gemini REST API (free tier).
-
-Everything here degrades to "no AI": with no GEMINI_API_KEY, over the daily budget, or on any API error the
-functions return None and callers carry on without AI. The key only ever travels in a request header."""
-
 import json
 import logging
 import math
@@ -46,16 +41,13 @@ def embed_dim() -> int:
     return max(128, min(3072, _env_int("GEMINI_EMBED_DIM", 384)))
 
 
-# ---------- budget: stay inside the free quota; resets with Google's day (midnight Pacific) and on restart ----------
-# Units: one embedded text (each item of a batch counts as a request on the free tier) or one text-model call.
-# Indexing is capped below the ~1,000/day embedding quota so visitors' searches always have some left.
 _BUDGET_ENV = {"search": ("GEMINI_DAILY_SEARCH", 200), "index": ("GEMINI_DAILY_INDEX_ITEMS", 750),
                "other": ("GEMINI_DAILY_OTHER", 200)}
 _used: dict[str, int] = {"search": 0, "index": 0, "other": 0}
 _QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 _used_day = ""
-_cooldown_until = 0.0  # set after a 429 so we stop hammering
-_last_error = ""  # last API failure (status + Google's message; never the key), shown to the admin
+_cooldown_until = 0.0
+_last_error = ""
 
 
 def _limit(bucket: str) -> int:
@@ -104,7 +96,6 @@ def usage() -> dict[str, int]:
 
 
 async def _post(path: str, body: dict) -> Optional[dict]:
-    """POST to the API; None on any failure. Tests replace this function."""
     global _cooldown_until
     try:
         async with httpx.AsyncClient(timeout=20) as client:
@@ -137,8 +128,6 @@ def _normalize(v: list[float]) -> list[float]:
 
 
 async def embed(texts: list[str], *, query: bool, bucket: str = "index") -> Optional[list[list[float]]]:
-    """Unit-length embedding vectors, one per text (None if AI is unavailable). `gemini-embedding-2` takes no
-    task_type, so the task is stated in a text prefix instead."""
     if not texts or not enabled():
         return None
     out: list[list[float]] = []
@@ -154,14 +143,13 @@ async def embed(texts: list[str], *, query: bool, bucket: str = "index") -> Opti
         data = await _post(f"models/{embed_model()}:batchEmbedContents", {"requests": reqs})
         vecs = [e.get("values") for e in (data or {}).get("embeddings", [])]
         if len(vecs) != len(chunk) or not all(isinstance(v, list) and v for v in vecs):
-            _used[bucket] = max(0, _used[bucket] - len(chunk))  # refused or failed: Google did not count it either
+            _used[bucket] = max(0, _used[bucket] - len(chunk))
             return None
         out.extend(_normalize(v) for v in vecs)
     return out
 
 
 async def generate_json(prompt: str, schema: dict, system: str = "") -> Optional[Any]:
-    """One structured-output call to the text model; the parsed JSON, or None."""
     if not enabled() or not _spend("other"):
         return None
     body: dict[str, Any] = {

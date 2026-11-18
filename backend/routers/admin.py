@@ -1,5 +1,3 @@
-"""Admin endpoints. Every route verifies the signed httpOnly admin cookie server-side."""
-
 import asyncio
 import csv
 import io
@@ -32,10 +30,8 @@ FAIL_LIMIT, FAIL_WINDOW = 5, 900
 GLOBAL_FAIL_LIMIT = 30
 
 
-# ---------- session ----------
 @router.post("/login", response_model=AdminMe)
 async def login(body: AdminLogin, request: Request, response: Response):
-    # Per-client limit, plus a global cap so rotating addresses can't brute-force the password.
     if peek_limited(request, "admin_fail", FAIL_LIMIT, FAIL_WINDOW) or global_limited("admin_fail", GLOBAL_FAIL_LIMIT, FAIL_WINDOW):
         raise HTTPException(status_code=429, detail="rate_limited")
     if not password_ok(body.password):
@@ -59,7 +55,6 @@ async def me(request: Request):
     return AdminMe(admin=is_admin(request))
 
 
-# ---------- overview ----------
 @guarded.get("/overview", response_model=AdminOverview)
 async def overview():
     reports = [Report(**aware(d)) for d in await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)]
@@ -123,7 +118,6 @@ async def trigger_link_check():
     return OkOut()
 
 
-# ---------- AI (Gemini) ----------
 @guarded.get("/ai", response_model=AIStatus)
 async def ai_status():
     return AIStatus(**await semantic.status())
@@ -131,13 +125,10 @@ async def ai_status():
 
 @guarded.post("/ai/reindex", response_model=AIStatus)
 async def ai_reindex():
-    """Start embedding anything new or changed so AI search can find it (also runs on its own after edits).
-    Runs in the background: a large catalog takes minutes on the free tier, longer than a proxied request."""
     semantic.schedule_sync(delay=0)
     return AIStatus(**await semantic.status())
 
 
-# ---------- resources ----------
 async def _delete_resource_docs(query: dict) -> None:
     docs = await db.resources.find(query, {"_id": 0, "id": 1, "file_name": 1}).to_list(100000)
     for d in docs:
@@ -179,7 +170,6 @@ async def delete_resource(resource_id: str):
     return OkOut()
 
 
-# ---------- sessions ----------
 @guarded.patch("/sessions/{session_id}", response_model=StudySession)
 async def update_session(session_id: str, body: StudySessionUpdate):
     doc = await db.sessions.find_one({"id": session_id}, {"_id": 0})
@@ -203,7 +193,6 @@ async def delete_session(session_id: str):
     return OkOut()
 
 
-# ---------- courses ----------
 @guarded.patch("/courses/{course_id}", response_model=Course)
 async def update_course(course_id: str, body: CourseUpdate):
     doc = await get_course_doc(course_id)
@@ -227,7 +216,6 @@ async def delete_course(course_id: str):
     return OkOut()
 
 
-# ---------- branches ----------
 async def _branch_conflict(body: BranchIn, exclude_id: str | None = None) -> None:
     q: dict = {"$or": [{"code_ar": body.code_ar.strip()}, {"code_en": body.code_en.strip()}]}
     if exclude_id:
@@ -266,7 +254,6 @@ async def delete_branch(branch_id: str):
     return OkOut()
 
 
-# ---------- import / export ----------
 @guarded.post("/import-courses", response_model=ImportResult)
 async def import_courses(body: ImportIn):
     branches = await branch_map()
@@ -301,11 +288,6 @@ async def import_courses(body: ImportIn):
 
 @guarded.post("/import-resources", response_model=ImportResourcesResult)
 async def import_resources(body: ImportIn):
-    """Bulk-add external links. CSV columns: code, name_ar, name_en, type, title, url, and optionally
-    has_solutions (1/true/yes), section (sub-heading such as the source folder) and description (header row
-    optional). Missing courses are created (name falls back to the code, editable later); a link already present
-    on its course is skipped, so re-uploading is safe. Courses and existing links are loaded once and new links inserted in one batch, so thousands of rows fit
-    well inside a proxied request."""
     branches = await branch_map()
     rows = list(csv.reader(io.StringIO(body.csv.lstrip("﻿"))))
     if rows and rows[0] and rows[0][0].strip().lower() in ("code", "course_code", "رمز"):
@@ -376,7 +358,6 @@ async def export_backup():
     })
 
 
-# ---------- public site settings ----------
 @guarded.put("/settings", response_model=SiteSettings)
 async def update_settings(body: SiteSettings):
     url = body.contact_url.strip()

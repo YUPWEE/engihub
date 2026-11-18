@@ -1,5 +1,3 @@
-"""Public, anonymous endpoints. No visitor identifiers are stored anywhere."""
-
 from datetime import date, timedelta
 from typing import Literal, Optional
 from urllib.parse import quote
@@ -41,7 +39,6 @@ ADD_LIMIT, ADD_WINDOW = 12, 600
 
 
 async def log_event(kind: str, target_id: str) -> None:
-    """Anonymous per-day counter: {kind, target_id, day, count}. Nothing about the visitor."""
     await db.events.update_one(
         {"kind": kind, "target_id": target_id, "day": today_iso()}, {"$inc": {"count": 1}}, upsert=True
     )
@@ -61,7 +58,6 @@ async def top_events(kind: str, limit: int) -> list[tuple[str, int]]:
     return [(r["_id"], r["n"]) for r in rows]
 
 
-# ---------- catalog ----------
 @router.get("/catalog", response_model=Catalog)
 async def catalog():
     return await cache.get_or_set("catalog", 60, _catalog)
@@ -106,11 +102,8 @@ async def _home_stats() -> HomeStats:
     return HomeStats(top_courses=top_courses, top_courses_fallback=fallback, top_resources=top_resources)
 
 
-# ---------- AI search ----------
 @router.get("/search", response_model=SearchOut)
 async def ai_search(request: Request, q: str = Query("", max_length=200)):
-    """Meaning-based search (e.g. "past papers for statics"). ai=false means it is unavailable right now
-    (no key, daily budget used, API error): the client then just keeps its normal keyword results."""
     if not gemini.enabled() or len(q.strip()) < 2:
         return SearchOut(ai=False)
     rate_limit(request, "search", 40, 600)
@@ -129,7 +122,6 @@ async def ai_search(request: Request, q: str = Query("", max_length=200)):
     )
 
 
-# ---------- courses ----------
 @router.get("/courses/{course_id}", response_model=CourseDetail)
 async def course_detail(course_id: str):
     return await cache.get_or_set(f"course:{course_id}", 30, lambda: _course_detail(course_id))
@@ -171,7 +163,6 @@ async def create_course(body: CourseIn, request: Request):
     return to_course(doc, await branch_map())
 
 
-# ---------- resources ----------
 @router.post("/resources", response_model=Resource)
 async def create_resource(
     request: Request,
@@ -211,7 +202,7 @@ async def create_resource(
     data = await file.read(storage.MAX_PDF_BYTES + 1)
     if len(data) > storage.MAX_PDF_BYTES:
         raise HTTPException(status_code=413, detail="too_large")
-    if not data.startswith(b"%PDF-"):  # magic bytes, not the extension
+    if not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="not_pdf")
     if await storage.used_bytes() + len(data) > storage.quota_bytes():
         raise HTTPException(status_code=507, detail="storage_full")
@@ -238,7 +229,6 @@ async def open_resource(resource_id: str):
     data = await storage.read_pdf(doc.get("file_name"))
     if data is None:
         raise HTTPException(status_code=404, detail="file_missing")
-    # HTTP headers must be latin-1: ASCII-only fallback name, real (Arabic) title goes in RFC 5987 filename*.
     safe_ascii = "".join(c if (c.isascii() and c.isalnum()) or c in "-_ " else "_" for c in doc["title"])[:80].strip("_ ") or "resource"
     return Response(data, media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename=\"{safe_ascii}.pdf\"; filename*=UTF-8''{quote(doc['title'][:80])}.pdf",
@@ -259,7 +249,6 @@ async def helpful(resource_id: str, request: Request):
     return HelpfulOut(helpful=doc["helpful"])
 
 
-# ---------- study sessions ----------
 @router.post("/sessions", response_model=StudySession)
 async def create_session(body: StudySessionIn, request: Request, background: BackgroundTasks):
     check_honeypot(body.website)
@@ -275,7 +264,6 @@ async def create_session(body: StudySessionIn, request: Request, background: Bac
     return s
 
 
-# ---------- reports ----------
 @router.post("/reports", response_model=OkOut)
 async def create_report(body: ReportIn, request: Request):
     check_honeypot(body.website)

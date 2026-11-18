@@ -78,7 +78,7 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
       if (!cid) {
         const created = await apiPost<Course>("/courses", { ...nc, website });
         cid = created.id;
-        setCourseId(cid); // a retry after a later failure must not re-create the course
+        setCourseId(cid);
         setNewCourse(false);
       }
 
@@ -124,7 +124,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
 
   return (
     <form onSubmit={submit} className="space-y-5" data-testid="add-resource-form">
-      {/* course */}
       <section className="space-y-2">
         <Label>{t("course")}</Label>
         {selected ? (
@@ -183,7 +182,6 @@ function AddForm({ courseId: initialCourseId, branchId, initialType, onDone }: O
         )}
       </section>
 
-      {/* type */}
       <section className="space-y-2">
         <Label>{t("type")}</Label>
         <div className="flex flex-wrap gap-2">

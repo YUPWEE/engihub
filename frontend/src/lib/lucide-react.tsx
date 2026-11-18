@@ -1,9 +1,4 @@
-// lucide-react 1.x removed brand logos (lucide-icons/lucide#670: "use Simple Icons"), yet
-// `import { Instagram } from "lucide-react"` is what most code, and every model, still writes.
-// Vite and tsconfig alias "lucide-react" here: everything from the real package, plus the removed
-// names backed by Simple Icons, or lucide's own 0.x glyph (ISC) where Simple Icons has no mark.
-// New code should import the Si* components from "@icons-pack/react-simple-icons" directly.
-/* oxlint-disable react/only-export-components -- every export here is an icon component */
+/* oxlint-disable react/only-export-components */
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { createLucideIcon, type LucideProps } from "lucide-react-upstream";
 import {
@@ -29,7 +24,6 @@ type IconNode = Parameters<typeof createLucideIcon>[1];
 
 function fromSimpleIcons(name: string, Si: IconType) {
   const Brand = forwardRef<SVGSVGElement, LucideProps>(function Brand(props, ref) {
-    // Simple Icons marks are filled shapes: lucide's stroke props mean nothing on them.
     const { size = 24, color = "currentColor", strokeWidth, absoluteStrokeWidth, ...rest } = props;
     void strokeWidth;
     void absoluteStrokeWidth;
@@ -50,10 +44,9 @@ export const Gitlab = fromSimpleIcons("Gitlab", SiGitlab);
 export const Instagram = fromSimpleIcons("Instagram", SiInstagram);
 export const Trello = fromSimpleIcons("Trello", SiTrello);
 export const Twitch = fromSimpleIcons("Twitch", SiTwitch);
-export const Twitter = fromSimpleIcons("Twitter", SiX); // the mark is X now
+export const Twitter = fromSimpleIcons("Twitter", SiX);
 export const Youtube = fromSimpleIcons("Youtube", SiYoutube);
 
-// Simple Icons carries no mark for these (brand-owner requests): lucide 0.577 glyphs, ISC.
 const LINKEDIN: IconNode = [
   ["path", { d: "M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z", key: "c2jq9f" }],
   ["rect", { width: "4", height: "12", x: "2", y: "9", key: "mk3on5" }],
@@ -93,7 +86,6 @@ export const Pocket = createLucideIcon("pocket", POCKET);
 export const Codepen = createLucideIcon("codepen", CODEPEN);
 export const Chromium = createLucideIcon("chromium", CHROMIUM);
 
-// lucide exposes every icon under three names; keep all three for the restored ones.
 export {
   Chrome as ChromeIcon, Chrome as LucideChrome,
   Chromium as ChromiumIcon, Chromium as LucideChromium,

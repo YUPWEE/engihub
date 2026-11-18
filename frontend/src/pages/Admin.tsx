@@ -30,7 +30,7 @@ function AiCard() {
   const { data } = useQuery({
     queryKey: ["admin-ai"],
     queryFn: () => apiGet<AIStatus>("/admin/ai"),
-    refetchInterval: (q) => (q.state.data?.syncing ? 5000 : false), // live progress while indexing
+    refetchInterval: (q) => (q.state.data?.syncing ? 5000 : false),
   });
   const reindex = useMutation({
     mutationFn: () => apiPost<AIStatus>("/admin/ai/reindex"),

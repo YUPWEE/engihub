@@ -17,7 +17,6 @@ function NotFound() {
   );
 }
 
-// One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
 export default function App() {
   return (
     <I18nProvider>

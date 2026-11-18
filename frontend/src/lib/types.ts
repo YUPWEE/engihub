@@ -1,5 +1,3 @@
-// Hand-written mirrors of backend/models/schemas.py — keep in sync in the same edit.
-
 export type ResourceType = "slides" | "notes" | "textbooks" | "exams" | "summaries" | "videos" | "other";
 export type Source = "pdf" | "gdrive" | "onedrive" | "youtube" | "other";
 export type LinkStatus = "ok" | "broken" | "unknown";
@@ -12,7 +10,7 @@ export interface OkOut {
 
 export interface SiteSettings {
   contact_url: string;
-  ai_search?: boolean; // read-only: server has an AI key, so meaning-based search is offered
+  ai_search?: boolean;
 }
 
 export interface BranchIn {
@@ -65,8 +63,8 @@ export interface Resource {
   type: ResourceType;
   has_solutions: boolean;
   description: string;
-  section?: string; // optional sub-heading inside the type group (set by bulk import)
-  title_en?: string; // English title when the original is Arabic ("" = use title)
+  section?: string;
+  title_en?: string;
   section_en?: string;
   kind: "pdf" | "link";
   url: string | null;
@@ -85,7 +83,7 @@ export interface ResourceUpdate {
   has_solutions: boolean;
   description: string;
   url: string | null;
-  section?: string | null; // omitted/null = unchanged
+  section?: string | null;
   title_en?: string | null;
 }
 

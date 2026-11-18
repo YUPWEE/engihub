@@ -1,5 +1,3 @@
-// Client-side course search: normalisation + ranked prefix/fuzzy matching.
-// Rank: exact code > code prefix > name prefix > contains > fuzzy.
 import type { Branch, Course } from "./types";
 
 const DIACRITICS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g;
@@ -88,7 +86,6 @@ export function searchCourses(index: SearchIndex, query: string, limit = 8, bran
   return hits.slice(0, limit).map((h) => h.c);
 }
 
-// "ريض 106" / "math-106" → { branchId, number } for prefilling the add-course form.
 export function parseCode(query: string, branches: Branch[]): { branchId: string; number: string } {
   const q = normalize(query);
   const m = q.match(/^(\D*?)(\d+[a-z]?)?$/);

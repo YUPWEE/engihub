@@ -1,12 +1,8 @@
-"""In-process tests for the bulk link importer (mongomock, no server needed).
-
-Run serially:  python -m pytest tests/test_import.py -n 0"""
-
 import os
 
 for k, v in dict(MONGO_URL="mongomock://local", DB_NAME="engihub_test", ADMIN_PASSWORD="pw",
                  ADMIN_TOKEN_SECRET="x" * 32, CORS_ORIGINS="http://test").items():
-    os.environ.setdefault(k, v)  # shared with test_ai.py when both run in one process
+    os.environ.setdefault(k, v)
 
 import httpx  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -32,10 +28,10 @@ async def admin(monkeypatch):
 async def test_import_sets_section_solutions_and_is_idempotent(admin):
     csv = HEADER + (
         "ريض 106,,,exams,47-1 (محلول),https://drive.google.com/file/d/a/view,1,النهائية,\n"
-        "ريض 106,,,slides,Lecture 1,https://drive.google.com/file/d/b/view,1,شرائح د. س,\n"  # solutions only for exams
-        "ريض 106,,,bogus,Plan,https://drive.google.com/file/d/c/view,,,\n"  # unknown type -> other
-        "ريض 106,,,exams,dup,https://drive.google.com/file/d/a/view,,,\n"  # same url in same file -> skipped
-        "زيف 999,,,exams,x,https://drive.google.com/file/d/z/view,,,\n"  # unknown branch -> error
+        "ريض 106,,,slides,Lecture 1,https://drive.google.com/file/d/b/view,1,شرائح د. س,\n"
+        "ريض 106,,,bogus,Plan,https://drive.google.com/file/d/c/view,,,\n"
+        "ريض 106,,,exams,dup,https://drive.google.com/file/d/a/view,,,\n"
+        "زيف 999,,,exams,x,https://drive.google.com/file/d/z/view,,,\n"
     )
     out = (await admin.post("/admin/import-resources", json={"csv": csv})).json()
     assert out["resources_created"] == 3 and out["skipped"] == 1 and len(out["errors"]) == 1

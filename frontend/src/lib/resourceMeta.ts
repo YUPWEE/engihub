@@ -1,4 +1,3 @@
-// Visual meta for resource types and sources — each category gets its own icon + tone.
 import {
   BookOpen,
   CirclePlay,
@@ -41,7 +40,6 @@ export function detectSource(url: string): Source {
     if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com|onedrive\.com)$/.test(host)) return "onedrive";
     if (/(youtube\.com|youtu\.be|youtube-nocookie\.com)$/.test(host)) return "youtube";
   } catch {
-    /* invalid */
   }
   return "other";
 }

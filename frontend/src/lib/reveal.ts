@@ -1,20 +1,12 @@
-// Scroll reveals: any element with data-reveal="focus|fade|slide|line|card|rise|item" plays its entrance (see the
-// motion section of index.css) the first time it scrolls into view. Elements added later by React (route changes,
-// data arriving, opening a <details>) are picked up automatically.
-
 import type { CSSProperties } from "react";
 
-/** Inline style that staggers a reveal: items enter 70 ms apart (capped after 8). */
 export const stagger = (i: number): CSSProperties => ({ "--i": i } as CSSProperties);
 
 const SELECTOR = "[data-reveal]:not([data-in]):not([data-watched])";
 
 export function startReveal(): void {
   if (typeof window === "undefined" || !("IntersectionObserver" in window)) return;
-  // No .motion class = everything renders in its final state (no support). Visitors who ask for reduced motion still
-  // get reveals, but index.css turns them into plain fades (no movement, blur or wipes).
   document.documentElement.classList.add("motion");
-  // Dev-only preview of the full motion on a machine set to reduce motion: open the site with ?motion
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("motion")) {
     document.documentElement.classList.add("force-motion");
   }
@@ -37,8 +29,6 @@ export function startReveal(): void {
     });
   };
 
-  // A fast jump (anchor link, End key) can carry elements from below the viewport to above it without them ever
-  // "entering" it; reveal anything already scrolled past so no blank cards are left behind.
   let sweeping = false;
   const sweepPassed = () => {
     if (sweeping) return;

@@ -17,8 +17,6 @@ import { cn } from "@/lib/utils";
 
 const collator = new Intl.Collator(["ar", "en"], { numeric: true, sensitivity: "base" });
 
-// Split one type group into sub-sections (e.g. Drive folders such as "النهائية"). Items without a section keep
-// their order and come first; sectioned items are sorted naturally (exams newest first, everything else 1→n).
 function sectionsOf(items: Resource[], type: ResourceType, lang: Lang): [string, Resource[]][] {
   const map = new Map<string, Resource[]>();
   for (const r of items) {
@@ -31,7 +29,6 @@ function sectionsOf(items: Resource[], type: ResourceType, lang: Lang): [string,
   return [...map.entries()].sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : collator.compare(a, b)));
 }
 
-// Guard against StrictMode's double effect run counting one visit twice.
 let lastOpen = { id: "", t: 0 };
 
 export default function CoursePage() {
@@ -199,7 +196,6 @@ export default function CoursePage() {
           })
         )}
       </div>
-
 
       <AddResourceDialog
         key={add.type ?? "res"}

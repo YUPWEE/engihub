@@ -91,7 +91,6 @@ export function CourseFields({ value, onChange, prefix }: { value: NewCourse; on
   );
 }
 
-// Parses "هعم 106", "GE106", "ge-106" or just "106" (uses the selected branch) with the search normalisation.
 function parseFullCode(code: string, branches: Branch[], fallbackBranch: string): { branchId: string; number: string } | null {
   const m = normalize(code).match(/^(\D*)(\d{3}[a-z]?)$/);
   if (!m) return null;
@@ -121,7 +120,7 @@ function AddCourseForm({ initial, onDone }: { initial: NewCourse; onDone: () => 
   const onCode = (v: string) => {
     setCode(v);
     const p = parseFullCode(v, branches, "");
-    if (p) setBranchId(p.branchId); // a typed prefix (هعم / GE) selects its branch
+    if (p) setBranchId(p.branchId);
   };
 
   const m = useMutation({
@@ -139,7 +138,7 @@ function AddCourseForm({ initial, onDone }: { initial: NewCourse; onDone: () => 
       navigate(`/course/${c.id}`);
     },
     onError: (e) => {
-      if (e instanceof ApiError && e.status === 409) qc.invalidateQueries({ queryKey: ["catalog"] }); // surfaces the existing-course link
+      if (e instanceof ApiError && e.status === 409) qc.invalidateQueries({ queryKey: ["catalog"] });
     },
   });
   const submit = (e: FormEvent) => {
@@ -240,7 +239,6 @@ export function AddCourseDialog({ open, onOpenChange, initial }: { open: boolean
   );
 }
 
-// Standalone "Course not found? Add it" trigger — dashed muted-teal secondary button.
 export function AddCourseButton({ onClick, className, testid }: { onClick: () => void; className?: string; testid: string }) {
   const { t } = useI18n();
   return (

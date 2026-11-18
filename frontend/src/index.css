@@ -64,7 +64,6 @@
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Light tokens kept for completeness; the app is dark-by-default (class="dark" on <html>). */
 :root {
     --background: #f6f8fb;
     --foreground: #0f172a;
@@ -166,12 +165,6 @@
     backdrop-filter: blur(14px);
 }
 
-/* ---------- motion ----------
-   One easing curve everywhere (out-quint), blur-to-focus headings, wipe-in cards, staggered lists.
-   Load-time pieces use plain classes; scroll reveals use [data-reveal="kind"] and run once when lib/reveal.ts
-   marks the element [data-in] (it only adds html.motion when the visitor allows motion, so without JS or with
-   reduced motion everything is simply visible). Reveals use `animation`, never `transition`, so they don't
-   clash with hover transitions on the same element. Stagger: style={{ "--i": index }}. */
 :root { --slide: 12px; }
 html[dir="ltr"] { --slide: -12px; }
 
@@ -229,7 +222,6 @@ html[dir="ltr"] { --slide: -12px; }
 .motion [data-reveal="rise"][data-in] { animation: revealRise 0.9s var(--ease-quint) var(--reveal-delay) backwards; }
 .motion [data-reveal="item"][data-in] { animation: revealItem 0.7s var(--ease-quint) var(--reveal-delay) backwards; }
 
-/* Accent line above section titles; it grows from the reading-start side. */
 .accent-line {
     display: block;
     height: 3px;
@@ -240,7 +232,6 @@ html[dir="ltr"] { --slide: -12px; }
 }
 html[dir="rtl"] .accent-line { transform-origin: right; background: linear-gradient(to left, var(--primary), var(--sage)); }
 
-/* Reduced motion: keep the gentle fades, drop movement, blur and wipes. */
 @media (prefers-reduced-motion: reduce) {
     html:not(.force-motion) :is(.word-focus, .lead-settle, .soft-rise) {
         animation-name: revealFade !important;

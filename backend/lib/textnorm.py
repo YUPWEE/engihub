@@ -1,5 +1,3 @@
-"""Arabic/English normalisation + URL helpers shared by routers (mirrors frontend/src/lib/search.ts)."""
-
 import ipaddress
 import re
 from typing import Optional
@@ -24,7 +22,6 @@ NUMBER_RE = re.compile(r"^\d{3}[A-Z]?$")
 
 
 def split_code(code: str) -> tuple[str, str]:
-    """'ريض 106' / 'MATH-106' -> ('ريض', '106') with the prefix normalised."""
     s = norm(code)
     m = re.match(r"^(\D+?)(\d.*)$", s)
     if not m:
@@ -32,23 +29,17 @@ def split_code(code: str) -> tuple[str, str]:
     return m.group(1), m.group(2).upper()
 
 
-# ---------- URLs ----------
-
-
 _INTERNAL_SUFFIXES = (".local", ".localhost", ".internal", ".lan", ".home", ".corp", ".intranet")
 
 
 def public_host(host: str) -> bool:
-    """False for IP literals that aren't globally routable (loopback, private, link-local...) and
-    obviously internal names. DNS-level checks happen again at fetch time in lib/linkcheck.py."""
     host = (host or "").lower().strip("[]")
     if not host or host == "localhost" or host.endswith(_INTERNAL_SUFFIXES):
         return False
     try:
         return ipaddress.ip_address(host).is_global
     except ValueError:
-        pass  # not an IP literal
-    # catch dotted forms like 0x7f.1 / 017.0.0.1 that some resolvers read as IPs: TLD must contain a letter
+        pass
     return not host.rsplit(".", 1)[-1].replace("-", "").isdigit() and not host.rsplit(".", 1)[-1].lower().startswith("0x")
 
 
@@ -58,7 +49,7 @@ def valid_https(url: str) -> bool:
     try:
         p = urlparse(url)
         host = (p.hostname or "").lower()
-        p.port  # raises ValueError on a malformed port
+        p.port
     except ValueError:
         return False
     return p.scheme == "https" and "." in host and not host.endswith(".") and public_host(host)

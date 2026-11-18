@@ -1,7 +1,3 @@
-"""Meaning-based search: courses and resources are embedded with Gemini, kept in the `embeddings` collection,
-and compared with the embedded query. No AI key, or any API failure -> search() returns None and the site's
-normal keyword search carries on alone."""
-
 import asyncio
 import hashlib
 import logging
@@ -16,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 _lock = asyncio.Lock()
 _pending: Optional[asyncio.Task] = None
-_vectors: Optional[list[tuple[str, list[float]]]] = None  # [("c:<id>" | "r:<id>", unit vector)]
+_vectors: Optional[list[tuple[str, list[float]]]] = None
 _query_cache: "OrderedDict[str, list[float]]" = OrderedDict()
 _dirty = False
-RETRY_WAIT = 65.0  # seconds; the free tier limits requests and tokens per minute
+RETRY_WAIT = 65.0
 MAX_SYNC_FAILURES = 6
-RESUME_AFTER = 30 * 60  # seconds before an incomplete sync (quota used up) tries again
+RESUME_AFTER = 30 * 60
 
 
 def _min_score() -> float:
@@ -32,7 +28,6 @@ def _min_score() -> float:
 
 
 async def _wanted() -> dict[str, str]:
-    """key -> the text that represents it."""
     branches = {b["id"]: b for b in await db.branches.find({}, {"_id": 0}).to_list(1000)}
     courses = {c["id"]: c for c in await db.courses.find({}, {"_id": 0}).to_list(20000)}
 
@@ -56,7 +51,6 @@ def _hash(text: str) -> str:
 
 
 async def sync() -> dict[str, int]:
-    """Bring stored embeddings in line with the catalog: embed what is new or changed, drop what is gone."""
     global _vectors
     if not gemini.enabled():
         return {"embedded": 0, "removed": 0, "total": 0, "pending": 0}
@@ -78,12 +72,11 @@ async def sync() -> dict[str, int]:
                 continue
             vecs = await gemini.embed([wanted[k] for k in keys], query=False)
             if vecs is None:
-                # Free-tier per-minute limits (or a transient error): wait it out, then retry smaller.
                 failures += 1
                 if failures > MAX_SYNC_FAILURES:
                     logger.warning("embedding sync stopped early (%d of %d done)", done, len(stale))
                     break
-                if gemini.cooldown_left() <= 0:  # not a rate limit (that sets a cooldown): try smaller requests
+                if gemini.cooldown_left() <= 0:
                     batch = max(5, batch // 2)
                 wait = max(gemini.cooldown_left(), RETRY_WAIT)
                 logger.info("embedding batch refused; retrying %d items in %.0fs", batch, wait)
@@ -94,15 +87,13 @@ async def sync() -> dict[str, int]:
                 await db.embeddings.update_one({"_id": k}, {"$set": {"h": _hash(wanted[k]), "v": v}}, upsert=True)
             done += len(keys)
             i += len(keys)
-            _vectors = None  # searches see new items as they arrive
+            _vectors = None
         _vectors = None
         logger.info("embedding sync: %d embedded, %d removed, %d total", done, len(gone), len(wanted))
         return {"embedded": done, "removed": len(gone), "total": len(wanted), "pending": len(stale) - done}
 
 
 def schedule_sync(delay: float = 5.0) -> None:
-    """Re-sync soon, coalescing bursts of edits into one run. Safe to call from any request: a call that arrives
-    while a run is in progress makes that run go round once more, so no edit is ever missed."""
     global _pending, _dirty
     if not gemini.enabled():
         return
@@ -117,10 +108,10 @@ def schedule_sync(delay: float = 5.0) -> None:
                 _dirty = False
                 await asyncio.sleep(delay)
                 result = await sync()
-                if result["pending"] and not _dirty:  # quota ran out: try again later until everything is indexed
+                if result["pending"] and not _dirty:
                     await asyncio.sleep(RESUME_AFTER)
                     _dirty = True
-        except Exception as exc:  # background job: never crash the app
+        except Exception as exc:
             logger.error("embedding sync failed: %s", exc)
 
     _pending = asyncio.create_task(run())
@@ -152,7 +143,6 @@ def _rank(items: list[tuple[str, list[float]]], q: list[float]) -> list[tuple[st
 
 
 async def search(query: str, max_courses: int = 5, max_resources: int = 8) -> Optional[tuple[list[str], list[str]]]:
-    """(course ids, resource ids) ranked by meaning, or None when AI search is unavailable."""
     q = " ".join(query.split())[:200]
     if not gemini.enabled() or len(q) < 2:
         return None
@@ -170,7 +160,6 @@ async def search(query: str, max_courses: int = 5, max_resources: int = 8) -> Op
     if not items:
         return None
     ranked = await asyncio.to_thread(_rank, items, qvec)
-    # Keep only clear matches: above an absolute floor and close to the best hit of the same kind.
     courses, resources = [], []
     for kind, bucket, cap in (("c:", courses, max_courses), ("r:", resources, max_resources)):
         of_kind = [(k, s) for k, s in ranked if k.startswith(kind)]

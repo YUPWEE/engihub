@@ -6,8 +6,6 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-// Base UI hands onValueChange `string | null`; a plain useState<string> setter is not
-// assignable. Coerce here so `onValueChange={setFoo}` type-checks against the common case.
 type SelectRootProps = Omit<SelectPrimitive.Root.Props<string>, "onValueChange"> & {
   onValueChange?: (value: string) => void
 }

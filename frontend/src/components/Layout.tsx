@@ -20,7 +20,6 @@ export function Wordmark({ className }: { className?: string }) {
   );
 }
 
-// A new page starts at the top (Back/Forward keep the browser's own scroll position).
 function ScrollToTop() {
   const { pathname } = useLocation();
   const type = useNavigationType();
@@ -30,7 +29,6 @@ function ScrollToTop() {
   return null;
 }
 
-// Header links: tapping the page you are already on scrolls back up to its top.
 function useToTop(to: string) {
   const { pathname } = useLocation();
   return (e: MouseEvent) => {

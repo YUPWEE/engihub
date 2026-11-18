@@ -11,7 +11,6 @@ from starlette.middleware.cors import CORSMiddleware
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
 from lib.db import client, ensure_indexes  # noqa: E402
 from lib import cache, semantic, translations  # noqa: E402
 from lib.linkcheck import link_check_loop  # noqa: E402
@@ -19,7 +18,6 @@ from lib.seed import seed_if_empty  # noqa: E402
 from routers import admin as admin_routes  # noqa: E402
 from routers import public as public_routes  # noqa: E402
 
-# Privacy: never log visitor addresses or user agents (uvicorn's access log contains them).
 logging.getLogger("uvicorn.access").disabled = True
 
 
@@ -28,11 +26,11 @@ async def lifespan(app: FastAPI):
     await ensure_indexes()
     await seed_if_empty()
     try:
-        await translations.apply()  # fill English titles/sections/names from data/translations_en.json
-    except Exception as exc:  # never block startup on this
+        await translations.apply()
+    except Exception as exc:
         logging.getLogger(__name__).error("applying translations failed: %s", exc)
     app.state.link_task = asyncio.create_task(link_check_loop())
-    semantic.schedule_sync(delay=20)  # index anything new since the last start (no-op without an AI key)
+    semantic.schedule_sync(delay=20)
     yield
     app.state.link_task.cancel()
     with suppress(asyncio.CancelledError):
@@ -55,8 +53,6 @@ api_router.include_router(admin_routes.router)
 api_router.include_router(admin_routes.guarded)
 
 
-# Writes clear the read cache so edits show up at once. The anonymous counters (course "open", resource
-# "helpful") are excluded: they fire on every visit and would otherwise empty the cache constantly.
 _COUNTER_SUFFIXES = ("/open", "/helpful")
 
 
@@ -87,5 +83,4 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Include the router in the main app — keep last.
 app.include_router(api_router)

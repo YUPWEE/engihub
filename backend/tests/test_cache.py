@@ -1,12 +1,8 @@
-"""In-process tests for the public read cache (lib/cache.py + the clear-on-write middleware).
-
-Run serially:  python -m pytest tests/test_cache.py -n 0"""
-
 import os
 
 for k, v in dict(MONGO_URL="mongomock://local", DB_NAME="engihub_test", ADMIN_PASSWORD="pw",
                  ADMIN_TOKEN_SECRET="x" * 32, CORS_ORIGINS="http://test").items():
-    os.environ.setdefault(k, v)  # shared with the other in-process test files
+    os.environ.setdefault(k, v)
 
 import httpx  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -28,7 +24,6 @@ async def api(monkeypatch):
 
 
 async def sneak_course(number: str) -> None:
-    """Insert straight into the DB (no API call, so nothing clears the cache)."""
     branch = await db.branches.find_one({"code_en": "MATH"})
     await db.courses.insert_one({"id": new_id(), "branch_id": branch["id"], "number": number,
                                  "name_ar": "", "name_en": f"Sneaky {number}"})
@@ -41,12 +36,12 @@ def numbers(catalog: dict) -> set[str]:
 async def test_catalog_is_served_from_cache_until_a_write(api):
     first = (await api.get("/catalog")).json()
     await sneak_course("901")
-    assert "901" not in numbers((await api.get("/catalog")).json())  # cached
+    assert "901" not in numbers((await api.get("/catalog")).json())
     branch = first["branches"][0]["id"]
     r = await api.post("/courses", json={"branch_id": branch, "number": "902", "name_en": "Via API"})
     assert r.status_code == 200
     fresh = numbers((await api.get("/catalog")).json())
-    assert {"901", "902"} <= fresh  # the write cleared the cache
+    assert {"901", "902"} <= fresh
 
 
 async def test_counters_do_not_clear_the_cache(api):
@@ -79,7 +74,7 @@ async def test_value_computed_across_a_clear_is_not_stored():
     cache.clear()
 
     async def slow_factory():
-        cache.clear()  # a write lands while this result is being computed
+        cache.clear()
         return "stale"
 
     assert await cache.get_or_set("k", 60, slow_factory) == "stale"

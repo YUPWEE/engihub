@@ -1,5 +1,3 @@
-"""Idempotent seed: default branches + a few sample courses. No fake resources/sessions."""
-
 from lib.db import db
 from models.schemas import Branch, new_id
 

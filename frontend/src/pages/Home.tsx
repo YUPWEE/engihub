@@ -27,7 +27,6 @@ export default function Home() {
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <section className="relative z-20 pt-12 pb-14 md:pt-20 md:pb-20" data-testid="hero-section">
         <h1 className="max-w-3xl text-4xl font-bold leading-[1.15] tracking-tight md:text-6xl" data-testid="hero-title">
-          {/* Words come into focus one after another (keyed by language so a switch replays it). */}
           {t("heroTitle").split(" ").map((w, i, all) => (
             <span key={`${lang}-${i}`}>
               <span className="word-focus" style={{ "--d": `${80 + i * 90}ms` } as React.CSSProperties}>{w}</span>

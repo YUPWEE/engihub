@@ -1,10 +1,3 @@
-"""English versions of imported Arabic content: resource titles, section headings, course and branch names.
-
-The translations live in backend/data/translations_en.json and are applied on every start (one bulk write). Only
-EMPTY English fields are filled, so anything an admin edits by hand is never overwritten. Section headings are
-translated part by part ("المصادر / شرائح د. فلان" -> "Resources / Dr. X's slides"), so new combinations of
-known folder names translate too. New uploads and imports get English the same way (english_for)."""
-
 import json
 import logging
 from functools import lru_cache
@@ -30,7 +23,6 @@ def _data() -> dict:
 
 
 def section_en(section: str) -> str:
-    """English for a section path, or "" if any part is unknown (better Arabic than half-translated)."""
     if not section:
         return ""
     parts = _data().get("sections", {})
@@ -39,19 +31,17 @@ def section_en(section: str) -> str:
         if p in parts:
             out.append(parts[p])
         elif not any("؀" <= ch <= "ۿ" for ch in p):
-            out.append(p)  # already Latin
+            out.append(p)
         else:
             return ""
     return " / ".join(out)
 
 
 def english_for(title: str, section: str = "") -> dict[str, str]:
-    """title_en / section_en for a new resource (empty strings when unknown)."""
     return {"title_en": _data().get("titles", {}).get(title, ""), "section_en": section_en(section)}
 
 
 async def apply() -> dict[str, int]:
-    """Fill missing English fields from the translations file. Idempotent and cheap to repeat."""
     data = _data()
     if not data:
         return {}
@@ -64,18 +54,15 @@ async def apply() -> dict[str, int]:
             ops.append(UpdateMany({"section": section, "section_en": EMPTY}, {"$set": {"section_en": en}}))
     res_mod = (await db.resources.bulk_write(ops, ordered=False)).modified_count if ops else 0
 
-    # Course names: keyed by Arabic code, e.g. "سلم 100".
     branches = {b["code_ar"]: b["id"] for b in await db.branches.find({}, {"_id": 0, "id": 1, "code_ar": 1}).to_list(1000)}
     course_ops = []
     for code, name_en in data.get("courses", {}).items():
         prefix, _, number = code.partition(" ")
         if prefix in branches:
-            # (branch, number) is unique; UpdateMany also keeps the local mongomock backend happy.
             course_ops.append(UpdateMany({"branch_id": branches[prefix], "number": norm_number(number), "name_en": EMPTY},
                                          {"$set": {"name_en": name_en}}))
     course_mod = (await db.courses.bulk_write(course_ops, ordered=False)).modified_count if course_ops else 0
 
-    # Branches: only replace placeholder values (when a field still equals the given "if" value).
     branch_mod = 0
     for code_ar, spec in data.get("branches", {}).items():
         for field, value in spec.get("set", {}).items():

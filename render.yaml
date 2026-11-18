@@ -1,5 +1,3 @@
-# Render Blueprint: the FastAPI backend as a free web service.
-# Secrets marked `sync: false` are entered once in the Render dashboard, never committed.
 services:
   - type: web
     name: engihub-api
@@ -13,21 +11,21 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
-      - key: MONGO_URL          # MongoDB Atlas connection string (mongodb+srv://...)
+      - key: MONGO_URL
         sync: false
       - key: DB_NAME
         value: engihub
-      - key: CORS_ORIGINS       # the Vercel site (browsers reach the API same-origin through Vercel's /api rewrite)
+      - key: CORS_ORIGINS
         value: https://engihub.xyz,https://engihub-sooty.vercel.app
       - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_TOKEN_SECRET
         generateValue: true
-      - key: STORAGE_QUOTA_MB   # PDFs live in MongoDB; Atlas free tier is 512 MB total
+      - key: STORAGE_QUOTA_MB
         value: "300"
       - key: APP_TZ
         value: Asia/Riyadh
-      - key: GEMINI_API_KEY     # optional: free Google AI Studio key; enables AI search + submission screening
+      - key: GEMINI_API_KEY
         sync: false
-      - key: CLIENT_IP_HEADER   # visitor address for rate limits: set (and overwritten) by Vercel on every request.
-        value: x-vercel-forwarded-for # Measured chain on Render: client, Vercel egress, Cloudflare, Render (positions are not stable).
+      - key: CLIENT_IP_HEADER
+        value: x-vercel-forwarded-for

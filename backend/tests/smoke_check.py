@@ -1,12 +1,3 @@
-"""Live smoke check against a running backend:  python tests/smoke_check.py [base_url]
-
-Reads ADMIN_PASSWORD from backend/.env. Prints PASS/FAIL per check, exits 1 on any FAIL.
-Creates a few throwaway rows (prefixed SMOKE) and removes them via the admin API at the end.
-
-The last check deliberately triggers the admin-login lockout (in-memory, 15 min), so restart the backend
-before running this script a second time. Start the backend with --no-proxy-headers so uvicorn does not
-trust X-Forwarded-For on its own."""
-
 import io
 import sys
 from pathlib import Path
@@ -27,7 +18,6 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 c = httpx.Client(base_url=BASE, timeout=20)
 
-# ---- public reads
 cat = c.get("/catalog").json()
 check("catalog has branches+courses", len(cat["branches"]) > 0 and len(cat["courses"]) > 0)
 course = next(x for x in cat["courses"] if x["resource_count"] >= 0)
@@ -37,7 +27,6 @@ check("unknown course 404", c.get("/courses/nope").status_code == 404)
 check("home 200", c.get("/home").status_code == 200)
 check("course open 200", c.post(f"/courses/{course['id']}/open").status_code == 200)
 
-# ---- link resources
 def add_link(url, **kw):
     data = {"course_id": course["id"], "title": "SMOKE link", "type": "notes", "kind": "link", "url": url, **kw}
     return c.post("/resources", data=data)
@@ -59,7 +48,6 @@ if link_id:
     check("link open redirects", c.get(f"/resources/{link_id}/open", follow_redirects=False).status_code == 302)
     check("report accepted", c.post("/reports", json={"target_type": "resource", "target_id": link_id, "reason": "broken"}).status_code == 200)
 
-# ---- pdf upload + Arabic title download (the bug fixed on Emergent)
 pdf = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 up = c.post("/resources", data={"course_id": course["id"], "title": "ورقة الرسم للاوتوكاد SMOKE", "type": "notes", "kind": "pdf"},
             files={"file": ("x.pdf", io.BytesIO(pdf), "application/pdf")})
@@ -73,12 +61,10 @@ bad = c.post("/resources", data={"course_id": course["id"], "title": "SMOKE bad"
              files={"file": ("x.pdf", io.BytesIO(b"not a pdf"), "application/pdf")})
 check("non-pdf rejected 415", bad.status_code == 415)
 
-# ---- study session
 s = c.post("/sessions", json={"course_id": course["id"], "name": "SMOKE s", "description": "d"})
 check("create session", s.status_code == 200, s.text)
 sess_id = s.json().get("id") if s.status_code == 200 else None
 
-# ---- admin
 check("admin route without cookie 401", c.get("/admin/overview").status_code == 401)
 check("wrong password 401", c.post("/admin/login", json={"password": "wrong"}).status_code == 401)
 ok = c.post("/admin/login", json={"password": ENV["ADMIN_PASSWORD"]})
@@ -91,13 +77,11 @@ adm = httpx.Client(base_url=BASE, timeout=20, headers={"Cookie": f"engihub_admin
 check("admin overview 200", adm.get("/admin/overview").status_code == 200)
 check("admin export 200", adm.get("/admin/export").status_code == 200)
 
-# ---- brute-force limiter must hold even when X-Forwarded-For is spoofed per request
 codes = []
 for i in range(9):
     codes.append(httpx.post(BASE + "/admin/login", json={"password": f"bad{i}"}, headers={"X-Forwarded-For": f"10.9.8.{i}"}, timeout=20).status_code)
 check("login limiter not bypassed by spoofed X-Forwarded-For", 429 in codes, f"codes={codes}")
 
-# ---- cleanup
 for rid in (link_id, pdf_id, ssrf_id, ssrf2_id):
     if rid:
         adm.delete(f"/admin/resources/{rid}")

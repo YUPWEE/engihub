@@ -1,5 +1,3 @@
-"""Shared Mongo handle — import `client`/`db` from here (server.py, routers, seed.py)."""
-
 import logging
 import os
 from pathlib import Path
@@ -12,7 +10,6 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 mongo_url = os.environ["MONGO_URL"]
 if mongo_url.startswith("mongomock://"):
-    # Local development only: in-memory fake Mongo (pip install mongomock-motor). Data is lost on restart.
     from mongomock_motor import AsyncMongoMockClient
 
     client = AsyncMongoMockClient()
@@ -22,7 +19,6 @@ db = client[os.environ["DB_NAME"]]
 
 logger = logging.getLogger(__name__)
 
-# One entry per collection: every field a route filters, sorts, or dedupes on. Applied by ensure_indexes() at startup.
 INDEXES: dict[str, list[IndexModel]] = {
     "branches": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                  IndexModel([("order", ASCENDING)], name="order")],
@@ -44,8 +40,8 @@ INDEXES: dict[str, list[IndexModel]] = {
 
 async def ensure_indexes() -> None:
     for collection, models in INDEXES.items():
-        for model in models:  # one at a time so a bad spec skips only itself
+        for model in models:
             try:
                 await db[collection].create_indexes([model])
-            except Exception as exc:  # never block boot on an index; the log line names what to fix
+            except Exception as exc:
                 logger.error("ensure_indexes(%s.%s): %s", collection, model.document["name"], exc)

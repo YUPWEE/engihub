@@ -1,4 +1,4 @@
-/* oxlint-disable react/only-export-components -- context module exports provider + hook */
+/* oxlint-disable react/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 const en = {
@@ -70,7 +70,6 @@ const en = {
   t_videos: "Videos (lecture recordings & explanations)",
   t_other: "Other links",
   contact: "Contact",
-  // add modal
   modalTitle: "Add / Recommend a resource",
   modalSub: "No account needed. Anyone — students or teachers — can contribute.",
   course: "Course",
@@ -105,7 +104,6 @@ const en = {
   submit: "Submit",
   submitting: "Submitting…",
   added: "Added — thank you for contributing!",
-  // report
   reportTitle: "Report this item",
   reportSub: "Reports are anonymous and reviewed by the site admin.",
   r_inappropriate: "Inappropriate content",
@@ -115,7 +113,6 @@ const en = {
   reportNote: "Details (optional)",
   reportSent: "Report sent. Thank you.",
   send: "Send",
-  // admin
   adminLoginTitle: "Admin access",
   adminLoginSub: "Enter the admin password to manage content.",
   password: "Password",
@@ -187,7 +184,6 @@ const en = {
   date: "Date",
   actions: "Actions",
   notFound: "Page not found",
-  // errors
   e_rate_limited: "Too many attempts. Please wait a few minutes and try again.",
   e_invalid_url: "Please enter a valid https:// link.",
   e_contact_link_not_allowed: "Personal contact links (WhatsApp, phone, email) aren't allowed for resources.",
@@ -415,7 +411,6 @@ export type Lang = "ar" | "en";
 const DICTS: Record<Lang, Record<TKey, string>> = { ar, en };
 const STORAGE_KEY = "engihub_lang";
 
-// English singular forms for count strings ("1 course", not "1 courses"). Arabic phrases here are number-neutral.
 const EN_SINGULAR = { coursesCount: "{n} course", resourcesCount: "{n} resource" } as const;
 
 interface I18n {
@@ -456,7 +451,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         try {
           localStorage.setItem(STORAGE_KEY, l);
         } catch {
-          /* private mode — keep in memory only */
         }
         setLangState(l);
       },

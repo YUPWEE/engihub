@@ -1,8 +1,5 @@
 import { Page, expect } from '@playwright/test';
 
-// Pre-scaffolded shared helpers. Add app-specific helpers (login, create-item,
-// mutation fixture) below — do not re-create this file.
-
 export async function waitForAppReady(page: Page) {
   await page.waitForLoadState('domcontentloaded');
 }

@@ -1,9 +1,3 @@
-"""Anti-abuse + admin session helpers.
-
-Rate limiting uses SHORT-LIVED IN-MEMORY counters keyed by a salted hash of the client
-address. The salt is random per process and never persisted; the raw address is never
-stored, logged, or written to the database."""
-
 import hashlib
 import hmac
 import os
@@ -22,15 +16,7 @@ ADMIN_TTL_SECONDS = 2 * 60 * 60
 
 
 def _client_addr(request: Request) -> str:
-    """Client address for rate limiting.
-
-    X-Forwarded-For is client-controlled unless a trusted reverse proxy appended to it, so it is
-    ignored by default. Behind N trusted proxies (Render, Vercel, nginx...) set TRUSTED_PROXY_HOPS=N and the
-    entry the outermost trusted proxy added (N-th from the right) is used instead."""
     direct = request.client.host if request.client else ""
-    # Preferred: a header your trusted edge sets itself and overwrites on every request (e.g. Vercel's
-    # `x-vercel-forwarded-for`). Independent of how many proxies sit in between.
-    # Caveat: only trustworthy if clients cannot reach this server except through that edge.
     header = os.environ.get("CLIENT_IP_HEADER", "").strip().lower()
     if header:
         first = request.headers.get(header, "").split(",")[0].strip()
@@ -52,7 +38,6 @@ def _client_key(request: Request, scope: str) -> str:
 
 
 def global_limited(scope: str, limit: int, window: int) -> bool:
-    """True when `scope` already saw `limit` events in `window` seconds across ALL clients."""
     now = time.monotonic()
     q = _buckets.get("global:" + scope)
     return bool(q) and sum(1 for t in q if t >= now - window) >= limit
@@ -74,7 +59,6 @@ def _prune(now: float) -> None:
 
 
 def rate_limit(request: Request, scope: str, limit: int, window: int) -> None:
-    """Raise 429 when this client exceeded `limit` hits for `scope` within `window` seconds."""
     now = time.monotonic()
     _prune(now)
     key = _client_key(request, scope)
@@ -99,7 +83,6 @@ def check_honeypot(value: str) -> None:
         raise HTTPException(status_code=400, detail="rejected")
 
 
-# ---------- admin ----------
 def _secret() -> str:
     return os.environ["ADMIN_TOKEN_SECRET"]
 

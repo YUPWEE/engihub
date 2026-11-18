@@ -18,7 +18,6 @@ interface Props {
   onAddCourse?: (q: string) => void;
 }
 
-// One row in the dropdown: a course, or (title set) a resource found by AI search that opens its course.
 interface AiOption {
   key: string;
   course: Course;
@@ -40,7 +39,6 @@ export function SearchBox({ value, onChange, placeholder, size = "md", branchId,
   const inputRef = useRef<HTMLInputElement>(null);
   const results = useMemo(() => searchCourses(index, value, 8, branchId), [index, value, branchId]);
   const ai = useAiSearch(value);
-  // AI suggestions come after the keyword matches, de-duplicated and kept inside the current branch filter.
   const aiOptions = useMemo<AiOption[]>(() => {
     const seen = new Set(results.map((c) => c.id));
     const inBranch = (c: Course) => !branchId || c.branch_id === branchId;

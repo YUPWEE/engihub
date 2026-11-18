@@ -1,13 +1,9 @@
-"""In-process tests for English translations of imported content (lib/translations.py).
-
-Run serially:  python -m pytest tests/test_translations.py -n 0"""
-
 import json
 import os
 
 for k, v in dict(MONGO_URL="mongomock://local", DB_NAME="engihub_test", ADMIN_PASSWORD="pw",
                  ADMIN_TOKEN_SECRET="x" * 32, CORS_ORIGINS="http://test").items():
-    os.environ.setdefault(k, v)  # shared with the other in-process test files
+    os.environ.setdefault(k, v)
 
 import httpx  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -52,8 +48,8 @@ async def test_apply_fills_titles_and_composes_sections(api):
     await translations.apply()
     ra, rb, rc = [await db.resources.find_one({"id": i}) for i in (a, b, c)]
     assert ra["title_en"] == "Final 47-1" and ra["section_en"] == "Dr. Fulan's slides / Final"
-    assert not rb.get("title_en") and not rb.get("section_en")  # nothing to translate
-    assert not rc.get("title_en") and not rc.get("section_en")  # unknown part -> keep Arabic, never half-translate
+    assert not rb.get("title_en") and not rb.get("section_en")
+    assert not rc.get("title_en") and not rc.get("section_en")
 
 
 async def test_apply_never_overrides_admin_edits(api):
@@ -70,7 +66,6 @@ async def test_course_and_branch_names_only_replace_placeholders(api):
     await translations.apply()
     assert (await db.courses.find_one({"id": course["id"]}))["name_en"] == "Integral Calculus (EN test)"
     assert (await db.branches.find_one({"id": branch["id"]}))["name_en"] == "Mathematics EN"
-    # a real (non-placeholder) value is left alone
     await db.branches.update_one({"id": branch["id"]}, {"$set": {"name_en": "Mathematics"}})
     await translations.apply()
     assert (await db.branches.find_one({"id": branch["id"]}))["name_en"] == "Mathematics"

@@ -4,7 +4,6 @@ import { useSyncExternalStore } from "react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-// The app's theme is the `dark` class on <html> (index.html or a toggle), never the viewer's OS setting.
 const subscribeToDocumentTheme = (onChange: () => void) => {
   const observer = new MutationObserver(onChange)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
@@ -22,7 +21,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme}
-      // bottom-right: top positions sit on the header nav and swallow clicks; bottom-left is the preview bug button
       position="bottom-right"
       className="toaster group"
       icons={{

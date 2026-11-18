@@ -1,6 +1,3 @@
-"""Best-effort link health for external resources. Never deletes anything — only stores a
-status (ok / broken / unknown) that the UI turns into a badge."""
-
 import asyncio
 import ipaddress
 import logging
@@ -20,7 +17,6 @@ MAX_REDIRECTS = 5
 
 
 async def resolves_public(host: str) -> bool:
-    """SSRF guard: every address the name resolves to must be globally routable."""
     if not public_host(host):
         return False
     try:
@@ -31,7 +27,6 @@ async def resolves_public(host: str) -> bool:
 
 
 async def safe_get(client: httpx.AsyncClient, url: str) -> httpx.Response:
-    """GET with manual redirect handling so each hop's host is checked before connecting."""
     for _ in range(MAX_REDIRECTS + 1):
         p = urlparse(url)
         if p.scheme not in ("http", "https") or not await resolves_public(p.hostname or ""):
@@ -57,7 +52,6 @@ async def check_url(client: httpx.AsyncClient, url: str) -> str:
         r = await safe_get(client, url)
         final_host = (r.url.host or "").lower()
         if host.endswith(("drive.google.com", "docs.google.com")):
-            # private/removed Drive files often bounce to a login page — can't tell, so unknown
             if final_host.startswith("accounts.") or "ServiceLogin" in str(r.url):
                 return "unknown"
         if r.status_code in (404, 410):
@@ -91,6 +85,6 @@ async def link_check_loop() -> None:
     while True:
         try:
             await check_all()
-        except Exception as exc:  # keep the daily job alive
+        except Exception as exc:
             logger.error("link check failed: %s", exc)
         await asyncio.sleep(CHECK_INTERVAL)

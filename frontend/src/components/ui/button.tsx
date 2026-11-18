@@ -53,7 +53,6 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       render={render}
-      // Native unless render swaps in a non-<button> element (e.g. <Link/>).
       nativeButton={
         nativeButton ??
         (render == null || (isValidElement(render) && render.type === "button"))

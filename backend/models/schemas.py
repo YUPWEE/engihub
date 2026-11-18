@@ -1,6 +1,3 @@
-"""Pydantic v2 models for EngiHub. Every model here has a hand-written TS mirror in
-frontend/src/lib/types.ts — keep the pair in sync in the same edit."""
-
 import uuid
 from datetime import datetime, timezone
 from typing import Literal, Optional
@@ -27,15 +24,13 @@ class OkOut(BaseModel):
 
 
 class SiteSettings(BaseModel):
-    """Public, admin-editable site settings (not secrets)."""
     contact_url: str
 
 
 class PublicSettings(SiteSettings):
-    ai_search: bool = False  # true when the server has an AI key, so the UI offers meaning-based search
+    ai_search: bool = False
 
 
-# ---------- branches ----------
 class BranchIn(BaseModel):
     code_ar: str = Field(min_length=1, max_length=12)
     code_en: str = Field(min_length=1, max_length=12)
@@ -48,13 +43,12 @@ class Branch(BranchIn):
     id: str = Field(default_factory=new_id)
 
 
-# ---------- courses ----------
 class CourseIn(BaseModel):
     branch_id: str
     number: str = Field(min_length=1, max_length=12)
     name_ar: str = Field(default="", max_length=160)
     name_en: str = Field(default="", max_length=160)
-    website: str = ""  # honeypot — must stay empty
+    website: str = ""
 
 
 class CourseUpdate(BaseModel):
@@ -80,7 +74,6 @@ class Catalog(BaseModel):
     courses: list[Course]
 
 
-# ---------- resources ----------
 class Resource(BaseModel):
     id: str = Field(default_factory=new_id)
     course_id: str
@@ -88,8 +81,8 @@ class Resource(BaseModel):
     type: ResourceType
     has_solutions: bool = False
     description: str = ""
-    section: str = ""  # optional sub-heading inside the type group (e.g. "Finals"); set by bulk import
-    title_en: str = ""  # English title when the original is Arabic (see lib/translations.py); "" = show title
+    section: str = ""
+    title_en: str = ""
     section_en: str = ""
     kind: Literal["pdf", "link"]
     url: Optional[str] = None
@@ -108,22 +101,21 @@ class ResourceUpdate(BaseModel):
     has_solutions: bool = False
     description: str = Field(default="", max_length=500)
     url: Optional[str] = None
-    section: Optional[str] = Field(default=None, max_length=120)  # None = leave unchanged
-    title_en: Optional[str] = Field(default=None, max_length=200)  # None = leave unchanged
+    section: Optional[str] = Field(default=None, max_length=120)
+    title_en: Optional[str] = Field(default=None, max_length=200)
 
 
 class HelpfulOut(BaseModel):
     helpful: int
 
 
-# ---------- study sessions ----------
 class StudySessionIn(BaseModel):
     course_id: str
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(min_length=1, max_length=500)
     specialization: str = Field(default="", max_length=120)
     contact_url: str = Field(default="", max_length=500)
-    website: str = ""  # honeypot
+    website: str = ""
 
 
 class StudySessionUpdate(BaseModel):
@@ -151,13 +143,12 @@ class CourseDetail(BaseModel):
     sessions: list[StudySession]
 
 
-# ---------- reports ----------
 class ReportIn(BaseModel):
     target_type: TargetType
     target_id: str
     reason: ReportReason
     note: str = Field(default="", max_length=500)
-    website: str = ""  # honeypot
+    website: str = ""
 
 
 class Report(BaseModel):
@@ -175,7 +166,6 @@ class ReportOut(Report):
     course_code: str = ""
 
 
-# ---------- home stats ----------
 class TopCourse(BaseModel):
     course: Course
     count: int
@@ -188,7 +178,7 @@ class ResourceWithCourse(BaseModel):
 
 
 class SearchOut(BaseModel):
-    ai: bool  # false -> AI search unavailable right now; the client keeps its keyword results
+    ai: bool
     courses: list[Course] = []
     resources: list[ResourceWithCourse] = []
 
@@ -199,7 +189,6 @@ class HomeStats(BaseModel):
     top_resources: list[ResourceWithCourse]
 
 
-# ---------- admin ----------
 class AdminLogin(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
@@ -236,7 +225,7 @@ class AIStatus(BaseModel):
     calls_used: int
     calls_limit: int
     syncing: bool = False
-    last_error: str = ""  # last Gemini API failure, for diagnosis
+    last_error: str = ""
 
 
 class ImportIn(BaseModel):

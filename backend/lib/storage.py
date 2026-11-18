@@ -1,10 +1,3 @@
-"""PDF storage inside MongoDB (collection `pdf_files`), under random filenames, with a total quota from
-STORAGE_QUOTA_MB.
-
-Stored in the database, not on disk, because free hosts (Render etc.) wipe the local disk on every restart.
-One document per PDF: MAX_PDF_BYTES (15 MiB) stays under MongoDB's 16 MiB document limit. MongoDB Atlas'
-free tier has 512 MB in total for everything, so keep STORAGE_QUOTA_MB well below that (e.g. 300)."""
-
 import os
 import secrets
 from typing import Optional

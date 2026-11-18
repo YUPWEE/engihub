@@ -1,7 +1,3 @@
-"""Live check of admin features + edge cases:  python tests/admin_check.py [base_url]
-Needs a running backend (fresh restart recommended: it consumes the 'add' rate limit at the end).
-Reads ADMIN_PASSWORD from backend/.env. Leaves no data behind except rate-limit counters."""
-
 import io
 import sys
 import time
@@ -27,7 +23,6 @@ assert r.status_code == 200, f"login failed {r.status_code} (restart the backend
 tok = r.headers["set-cookie"].split("engihub_admin=")[1].split(";")[0]
 a = httpx.Client(base_url=BASE, timeout=30, headers={"Cookie": f"engihub_admin={tok}"})
 
-# ---------- branches
 b = a.post("/admin/branches", json={"code_ar": "اختبر", "code_en": "TST", "name_ar": "فرع اختبار", "name_en": "Test branch"})
 check("create branch", b.status_code == 200, b.text)
 bid = b.json()["id"]
@@ -36,11 +31,10 @@ check("update branch", a.patch(f"/admin/branches/{bid}", json={"code_ar": "اخ�
 check("branch unknown 404", a.patch("/admin/branches/nope", json={"code_ar": "q", "code_en": "q", "name_ar": "q", "name_en": "q"}).status_code == 404)
 check("branch code too long 422", a.post("/admin/branches", json={"code_ar": "x" * 13, "code_en": "y", "name_ar": "a", "name_en": "b"}).status_code == 422)
 
-# ---------- courses (public create + validation)
 def add_course(num, ar="مقرر", en="Course", **kw):
     return c.post("/courses", json={"branch_id": bid, "number": num, "name_ar": ar, "name_en": en, **kw})
 
-r1 = add_course("١٠٦")  # Arabic-Indic digits
+r1 = add_course("١٠٦")
 check("course Arabic digits normalised to 106", r1.status_code == 200 and r1.json()["number"] == "106", r1.text)
 cid = r1.json().get("id")
 check("course lowercase suffix 107a -> 107A", (lambda x: x.status_code == 200 and x.json()["number"] == "107A")(add_course("107a")))
@@ -52,12 +46,10 @@ check("course honeypot", add_course("110", website="bot").status_code == 400)
 check("admin update course", a.patch(f"/admin/courses/{cid}", json={"branch_id": bid, "number": "106", "name_ar": "معدل", "name_en": "Edited"}).json().get("name_en") == "Edited")
 check("branch not empty 409", a.delete(f"/admin/branches/{bid}").status_code == 409)
 
-# ---------- CSV import
 csv_text = "code,name_ar,name_en,branch\nTST 201,اسم,Name,TST\nTST 106,مكرر,Dup,TST\nZZZ 300,x,y,\nTST 12,bad,bad,TST\n"
 imp = a.post("/admin/import-courses", json={"csv": csv_text}).json()
 check("import: 1 created, 1 skipped, 2 errors", imp.get("created") == 1 and imp.get("skipped") == 1 and len(imp.get("errors", [])) == 2, str(imp))
 
-# ---------- resources: edge cases
 def add_link(title="EDGE", url="https://example.com/x", **kw):
     return c.post("/resources", data={"course_id": cid, "title": title, "type": "exams", "kind": "link", "url": url, **kw})
 
@@ -82,7 +74,6 @@ check("pdf >15MB rejected 413", big.status_code == 413, str(big.status_code))
 nofile = c.post("/resources", data={"course_id": cid, "title": "nf", "type": "notes", "kind": "pdf"})
 check("pdf kind without file 400", nofile.status_code == 400)
 
-# ---------- PDF storage lives in MongoDB: counter goes up on upload, back down on delete
 used0 = a.get("/admin/overview").json()["storage"]["used_bytes"]
 pdf = b"%PDF-1.4\n" + b"x" * 1000 + b"\n%%EOF\n"
 up = c.post("/resources", data={"course_id": cid, "title": "STORAGE", "type": "notes", "kind": "pdf"},
@@ -95,7 +86,6 @@ check("pdf bytes round-trip through MongoDB intact", dl.status_code == 200 and d
 a.delete(f"/admin/resources/{up.json()['id']}")
 check("deleting the resource frees its bytes", a.get("/admin/overview").json()["storage"]["used_bytes"] == used0)
 
-# ---------- bulk resource import (CSV)
 res_csv = "\n".join([
     "code,name_ar,name_en,type,title,url",
     "اختبر 301,اسم عربي,Name EN,exams,Exams folder,https://drive.google.com/drive/folders/abc123",
@@ -121,7 +111,6 @@ check("imported links: source=gdrive, kind=link, unknown type -> other",
       len(d301) == 2 and all(r["source"] == "gdrive" and r["kind"] == "link" for r in d301) and {r["type"] for r in d301} == {"exams", "other"}, str(d301))
 check("import requires admin", httpx.post(BASE + "/admin/import-resources", json={"csv": res_csv}, timeout=20).status_code == 401)
 
-# ---------- sessions + reports
 s = c.post("/sessions", json={"course_id": cid, "name": "جلسة", "description": "وصف", "contact_url": "https://t.me/x"}).json()
 check("session bad contact rejected", c.post("/sessions", json={"course_id": cid, "name": "n", "description": "d", "contact_url": "http://x.com"}).status_code == 400)
 check("session update", a.patch(f"/admin/sessions/{s['id']}", json={"name": "جلسة2", "description": "d", "contact_url": ""}).json().get("contact_url") is None)
@@ -136,7 +125,6 @@ a.delete(f"/admin/reports/{ov['reports'][0]['id']}")
 check("clear one report", len(a.get("/admin/overview").json()["reports"]) == 1)
 check("clear all reports", a.delete("/admin/reports").status_code == 200 and len(a.get("/admin/overview").json()["reports"]) == 0)
 
-# ---------- settings / export / link check
 check("settings http rejected", a.put("/admin/settings", json={"contact_url": "http://t.me/x"}).status_code == 400)
 old = c.get("/settings").json()["contact_url"]
 check("settings update", a.put("/admin/settings", json={"contact_url": "https://t.me/+test"}).status_code == 200 and c.get("/settings").json()["contact_url"] == "https://t.me/+test")
@@ -148,7 +136,6 @@ time.sleep(6)
 st = {x["id"]: x.get("link_status") for x in c.get(f"/courses/{cid}").json()["resources"]}
 check("link check set a status (ok/unknown, none left 'unknown' only if offline)", all(v in ("ok", "unknown", "broken") for v in st.values()), str(st))
 
-# ---------- delete cascade
 check("delete session", a.delete(f"/admin/sessions/{s['id']}").status_code == 200)
 check("delete course cascades", a.delete(f"/admin/courses/{cid}").status_code == 200 and c.get(f"/courses/{cid}").status_code == 404)
 for course in c.get("/catalog").json()["courses"]:
@@ -156,7 +143,6 @@ for course in c.get("/catalog").json()["courses"]:
         a.delete(f"/admin/courses/{course['id']}")
 check("delete branch (now empty)", a.delete(f"/admin/branches/{bid}").status_code == 200)
 
-# ---------- add rate limit (last: consumes budget). 12 adds / 10 min
 cat = c.get("/catalog").json()["courses"][0]["id"]
 codes = [c.post("/resources", data={"course_id": cat, "title": f"RL{i}", "type": "notes", "kind": "link", "url": "https://example.com/rl"}).status_code for i in range(14)]
 check("add rate limit kicks in with 429", 429 in codes, str(codes))

@@ -1,5 +1,3 @@
-"""Run `cd /app/backend && python seed.py` — seeds branches + sample courses if the DB is empty."""
-
 import asyncio
 
 from lib.db import ensure_indexes

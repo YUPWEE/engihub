@@ -1,4 +1,3 @@
-// TanStack Query hooks + small helpers shared by pages.
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiGet } from "./api";
@@ -19,7 +18,6 @@ function readCatalogCache() {
   return cacheMemo;
 }
 
-// Full course list loaded once and cached in the browser: search runs client-side.
 export function useCatalog() {
   const cached = readCatalogCache();
   return useQuery({
@@ -29,7 +27,6 @@ export function useCatalog() {
       try {
         localStorage.setItem(CATALOG_KEY, JSON.stringify({ t: Date.now(), data }));
       } catch {
-        /* storage full / private mode */
       }
       cacheMemo = { t: Date.now(), data };
       return data;
@@ -44,8 +41,6 @@ export function useSettings() {
   return useQuery({ queryKey: ["settings"], queryFn: () => apiGet<SiteSettings>("/settings"), staleTime: 5 * 60_000 });
 }
 
-// Meaning-based search, layered on top of the instant keyword search. Debounced; silently absent when the
-// server has no AI key, hits its daily budget, or errors.
 export function useAiSearch(query: string): { data?: SearchOut; loading: boolean } {
   const { data: settings } = useSettings();
   const trimmed = query.trim();
@@ -97,7 +92,6 @@ export function errorKey(err: unknown): TKey {
   return "e_generic";
 }
 
-// Resource text in the reader's language: English versions exist for content imported in Arabic.
 export const resourceTitle = (r: Resource, lang: Lang) => (lang === "en" && r.title_en) || r.title;
 export const resourceSection = (r: Resource, lang: Lang) => (lang === "en" && r.section_en) || r.section || "";
 
@@ -125,7 +119,6 @@ export function formatBytes(n: number): string {
   return `${(n / 1024 ** 3).toFixed(2)} GB`;
 }
 
-// One "helpful" vote per resource per browser — remembered locally, no identifiers sent.
 const VOTES_KEY = "engihub_helpful_v1";
 export function votedSet(): Set<string> {
   try {
@@ -140,6 +133,5 @@ export function rememberVote(id: string) {
   try {
     localStorage.setItem(VOTES_KEY, JSON.stringify([...s]));
   } catch {
-    /* ignore */
   }
 }

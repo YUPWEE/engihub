@@ -1,7 +1,3 @@
-"""AI screening of public submissions. A suspicious item is only *flagged*: it gets a report in the admin
-dashboard (note starts with "AI:") and stays visible until the admin decides. Nothing is ever hidden or
-deleted automatically, and any failure or missing key means the item is simply not screened."""
-
 import logging
 from typing import Optional
 
@@ -63,7 +59,7 @@ async def screen_resource(resource_id: str) -> None:
         })
         if out and out["verdict"] == "review":
             await _flag("resource", resource_id, out)
-    except Exception as exc:  # background job: never crash the app
+    except Exception as exc:
         logger.error("resource screening failed: %s", exc)
 
 
