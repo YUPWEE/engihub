@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState, type MouseEvent } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Languages, LayoutDashboard, LogOut, QrCode, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -20,8 +20,31 @@ export function Wordmark({ className }: { className?: string }) {
   );
 }
 
+// A new page starts at the top (Back/Forward keep the browser's own scroll position).
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  const type = useNavigationType();
+  useEffect(() => {
+    if (type !== "POP") window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname, type]);
+  return null;
+}
+
+// Header links: tapping the page you are already on scrolls back up to its top.
+function useToTop(to: string) {
+  const { pathname } = useLocation();
+  return (e: MouseEvent) => {
+    if (pathname !== to || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "instant" : "smooth" });
+  };
+}
+
 function NavItems({ className, variant }: { className?: string; variant: "desktop" | "mobile" }) {
   const { t } = useI18n();
+  const homeTop = useToTop("/");
+  const coursesTop = useToTop("/courses");
   const item = ({ isActive }: { isActive: boolean }) =>
     cn(
       "rounded-full px-3.5 py-1.5 text-sm transition-colors duration-200",
@@ -29,10 +52,10 @@ function NavItems({ className, variant }: { className?: string; variant: "deskto
     );
   return (
     <nav className={cn("items-center gap-1", className)}>
-      <NavLink to="/" end className={item} data-testid={`nav-home-link-${variant}`}>
+      <NavLink to="/" end onClick={homeTop} className={item} data-testid={`nav-home-link-${variant}`}>
         {t("home")}
       </NavLink>
-      <NavLink to="/courses" className={item} data-testid={`nav-all-courses-link-${variant}`}>
+      <NavLink to="/courses" onClick={coursesTop} className={item} data-testid={`nav-all-courses-link-${variant}`}>
         {t("allCourses")}
       </NavLink>
     </nav>
@@ -41,10 +64,11 @@ function NavItems({ className, variant }: { className?: string; variant: "deskto
 
 function Header() {
   const { t, lang, setLang } = useI18n();
+  const homeTop = useToTop("/");
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5">
-        <Link to="/" className="flex items-center gap-2.5 justify-self-start" data-testid="header-ksu-link">
+        <Link to="/" onClick={homeTop} className="flex items-center gap-2.5 justify-self-start" data-testid="header-ksu-link">
           <img
             src="/ksu-logo.png"
             alt={t("ksu")}
@@ -60,7 +84,7 @@ function Header() {
             <span className="block text-xs text-muted-foreground">{t("college")}</span>
           </span>
         </Link>
-        <Link to="/" aria-label="EngiHub" data-testid="header-wordmark">
+        <Link to="/" onClick={homeTop} aria-label="EngiHub" data-testid="header-wordmark">
           <Wordmark className="text-2xl md:text-[1.9rem]" />
         </Link>
         <div className="flex items-center gap-2 justify-self-end">
@@ -160,6 +184,7 @@ export default function Layout() {
   const [qrOpen, setQrOpen] = useState(false);
   return (
     <div className="flex min-h-svh flex-col">
+      <ScrollToTop />
       <Header />
       {isAdmin && <AdminBanner />}
       <main className="flex-1">
